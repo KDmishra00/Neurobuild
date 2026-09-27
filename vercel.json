@@ -1,27 +1,9 @@
 {
-  "version": 2,
-  "buildCommand": "npm --prefix client install && npm --prefix client run build",
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "client/dist/**",
-          "middleware/**",
-          "models/**",
-          "routes/**",
-          "services/**",
-          "frontend/**",
-          "public/**"
-        ]
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
-    }
+  "buildCommand": "npm run build",
+  "outputDirectory": "client/dist",
+  "installCommand": "npm install --omit=dev",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

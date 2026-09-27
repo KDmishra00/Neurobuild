@@ -77,6 +77,14 @@ if (process.env.MONGODB_URI) {
   console.log('MONGODB_URI not set, running without database persistence');
 }
 
+// Normalize /api prefix for Vercel serverless function execution
+app.use((req, res, next) => {
+  if (process.env.VERCEL && !req.url.startsWith('/api')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/generate'));
