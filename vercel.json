@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix client install && cd client && npx vite build",
+  "buildCommand": "npm --prefix client install && npm --prefix client run build:vercel",
   "installCommand": "npm install",
   "outputDirectory": "client/dist",
   "functions": {
