@@ -47,13 +47,17 @@ const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
 const GROQ_API_URL = process.env.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
+function getGroqKey() {
+  return process.env.GROQ_API_KEY || '';
+}
+
 // OpenAI Direct API configuration
 const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // OpenAI GPT-6 Astra & Experiential Labs Gateway configuration
 const ASTRA_API_URL = process.env.ASTRA_API_URL || 'https://api.experientiallabs.ai/v1/chat/completions';
-const ASTRA_API_KEY = process.env.ASTRA_API_KEY || 'xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
+const ASTRA_API_KEY = process.env.ASTRA_API_KEY;
 
 // ═══════════════════════════════════════════
 // SYSTEM PROMPTS
@@ -349,27 +353,22 @@ class AIService {
         })
       });
 
-      // Experiential Labs key fallback if 401
-      if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784') {
-        headers.Authorization = 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
-        response = await fetch(apiUrl, {
+      // Experiential Labs key fallback or auto-fallback to Groq if Astra fails
+      if (!response.ok && isAstra) {
+        console.warn(`[Cloud] Astra gateway returned ${response.status}; seamlessly routing to Groq openai/gpt-oss-120b`);
+        response = await fetch(GROQ_API_URL, {
           method: 'POST',
-          headers,
-          body: JSON.stringify({ model: modelName, max_tokens: 4096, messages })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getGroqKey()}`,
+            'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-oss-120b',
+            max_tokens: 4096,
+            messages
+          })
         });
-      }
-
-      // Experiential Labs gpt-6-astra auto-fallback to gpt-6-sol if purchase is required
-      if (!response.ok && isAstra && modelName === 'gpt-6-astra') {
-        const errText = await response.text().catch(() => '');
-        if (errText.includes('model_requires_purchase') || response.status === 429) {
-          console.warn('[Cloud] gpt-6-astra requires credit purchase; automatically switching to gpt-6-sol');
-          response = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ model: 'gpt-6-sol', max_tokens: 4096, messages })
-          });
-        }
       }
 
       if (!response.ok) {
@@ -737,17 +736,26 @@ class AIService {
     let modelName = (model || '').replace(':cloud', '').replace(/^groq\//, '');
 
     if (isAstra) {
-      apiUrl = process.env.ASTRA_API_URL || ASTRA_API_URL;
-      apiKey = process.env.ASTRA_API_KEY || ASTRA_API_KEY;
-      const clean = String(model).toLowerCase();
-      if (clean.includes('gpt-6-sol') || clean.includes('sol')) {
-        modelName = 'gpt-6-sol';
-      } else if (clean.includes('gpt-6-luna') || clean.includes('luna')) {
-        modelName = 'gpt-6-luna';
-      } else if (clean.includes('claude-opus-5.5')) {
-        modelName = 'claude-opus-5.5';
+      const customKey = process.env.ASTRA_API_KEY;
+      const hasCustomAstra = !!(customKey && !customKey.includes('your_'));
+      if (hasCustomAstra) {
+        apiUrl = process.env.ASTRA_API_URL || ASTRA_API_URL;
+        apiKey = customKey;
+        const clean = String(model).toLowerCase();
+        if (clean.includes('gpt-6-sol') || clean.includes('sol')) {
+          modelName = 'gpt-6-sol';
+        } else if (clean.includes('gpt-6-luna') || clean.includes('luna')) {
+          modelName = 'gpt-6-luna';
+        } else if (clean.includes('claude-opus-5.5')) {
+          modelName = 'claude-opus-5.5';
+        } else {
+          modelName = 'gpt-6-astra';
+        }
       } else {
-        modelName = 'gpt-6-astra';
+        // Experiential Labs gateway key is expired/revoked — route directly to Groq flagship 120B
+        apiUrl = GROQ_API_URL;
+        apiKey = getGroqKey();
+        modelName = 'openai/gpt-oss-120b';
       }
     } else if (isOpenAI) {
       apiUrl = OPENAI_API_URL;
@@ -755,7 +763,7 @@ class AIService {
       modelName = modelName.replace(/^openai\//, '');
     } else if (isGroq) {
       apiUrl = GROQ_API_URL;
-      apiKey = GROQ_API_KEY;
+      apiKey = getGroqKey();
     } else if (isMoonshot) {
       apiUrl = MOONSHOT_API_URL;
       apiKey = MOONSHOT_API_KEY;
@@ -766,7 +774,8 @@ class AIService {
 
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Authorization': `Bearer ${apiKey}`,
+      'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
     };
     if (!isNvidia && !isGroq && !isAstra && !isOpenAI) {
       headers['HTTP-Referer'] = 'http://localhost:3000';
@@ -783,11 +792,11 @@ class AIService {
 
   // Generate using cloud API (OpenAI-compatible format)
   async generateCloud(prompt, model) {
-    const { apiUrl, modelName, headers } = this._resolveCloudConfig(model);
+    const { apiUrl, modelName, headers, isAstra } = this._resolveCloudConfig(model);
     
     console.log(`[Cloud] Generating with model: ${modelName} via ${apiUrl}`);
 
-    const response = await fetch(apiUrl, {
+    let response = await fetch(apiUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -799,6 +808,27 @@ class AIService {
         ]
       })
     });
+
+    // Auto-fallback to Groq if Astra fails
+    if (!response.ok && isAstra) {
+      console.warn(`[Cloud] Astra gateway returned ${response.status}; seamlessly routing to Groq openai/gpt-oss-120b`);
+      response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getGroqKey()}`,
+          'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-120b',
+          max_tokens: 4096,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: `Create a website: ${prompt}` }
+          ]
+        })
+      });
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -831,14 +861,18 @@ class AIService {
       })
     });
 
-    // Experiential Labs key fallback if 401
-    if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784') {
-      headers.Authorization = 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
-      response = await fetch(apiUrl, {
+    // Experiential Labs key fallback or auto-fallback to Groq if Astra fails
+    if (!response.ok && isAstra) {
+      console.warn(`[Cloud Stream] Astra gateway returned ${response.status}; seamlessly routing to Groq openai/gpt-oss-120b`);
+      response = await fetch(GROQ_API_URL, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getGroqKey()}`,
+          'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
+        },
         body: JSON.stringify({
-          model: modelName,
+          model: 'openai/gpt-oss-120b',
           stream: true,
           max_tokens: 4096,
           messages: [
@@ -847,27 +881,6 @@ class AIService {
           ]
         })
       });
-    }
-
-    // Experiential Labs gpt-6-astra auto-fallback to gpt-6-sol if purchase is required
-    if (!response.ok && isAstra && modelName === 'gpt-6-astra') {
-      const errText = await response.text().catch(() => '');
-      if (errText.includes('model_requires_purchase') || response.status === 429) {
-        console.warn('[Cloud Stream] gpt-6-astra requires credit purchase; automatically switching to gpt-6-sol');
-        response = await fetch(apiUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model: 'gpt-6-sol',
-            stream: true,
-            max_tokens: 4096,
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: `Create a website: ${prompt}` }
-            ]
-          })
-        });
-      }
     }
 
     if (!response.ok) {
@@ -1019,12 +1032,26 @@ class AIService {
   /** Internal: stream chat from Ollama or cloud */
   async *_streamOllamaChat(messages, model) {
     if (this.isExternalCloudModel(model)) {
-      const { apiUrl, modelName, headers } = this._resolveCloudConfig(model);
-      const response = await fetch(apiUrl, {
+      const { apiUrl, modelName, headers, isAstra } = this._resolveCloudConfig(model);
+      let response = await fetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({ model: modelName, stream: true, max_tokens: 4096, messages })
       });
+
+      if (!response.ok && isAstra) {
+        console.warn(`[Cloud Stream Chat] Astra gateway returned ${response.status}; seamlessly routing to Groq openai/gpt-oss-120b`);
+        response = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getGroqKey()}`,
+            'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
+          },
+          body: JSON.stringify({ model: 'openai/gpt-oss-120b', stream: true, max_tokens: 4096, messages })
+        });
+      }
+
       if (!response.ok) throw new Error(`Cloud API error: ${response.status}`);
 
       const reader = response.body.getReader();

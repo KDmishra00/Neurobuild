@@ -3,16 +3,23 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const aiService = require('../services/ai');
 const { auth } = require('../middleware/auth');
+const { requireDb } = require('../middleware/db');
 const { validateGenerate } = require('../middleware/validate');
 const User = require('../models/User');
+
+// Ensure database connection is ready for any generation or model route
+router.use(requireDb);
 
 // Check whether a required cloud API key is configured
 function hasValidApiKey(model) {
   // Ollama Cloud aliases (no slash, e.g. "deepseek-v4-flash:cloud") run
   // through the local Ollama server and need no API key here.
   if (!String(model).includes('/')) return true;
+  if (aiService.isGroqModel(model)) {
+    return true; // Groq is available with built-in/env key
+  }
   if (aiService.isAstraModel(model)) {
-    return !!process.env.ASTRA_API_KEY && !process.env.ASTRA_API_KEY.includes('your_');
+    return true; // Astra is routed seamlessly to Groq
   }
   if (aiService.isOpenAIModel(model)) {
     return !!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('your_');
@@ -23,41 +30,17 @@ function hasValidApiKey(model) {
   if (aiService.isMoonshotModel(model)) {
     return !!process.env.MOONSHOT_API_KEY && !process.env.MOONSHOT_API_KEY.includes('your_');
   }
-  if (aiService.isGroqModel(model)) {
-    return !!process.env.GROQ_API_KEY && !process.env.GROQ_API_KEY.includes('your_');
-  }
   return !!process.env.CLOUD_API_KEY && !process.env.CLOUD_API_KEY.includes('your_');
 }
 
-// Experiential Labs & Supported Cloud Model Options
+// Supported Cloud Model Options
 const STATIC_MODEL_OPTIONS = [
   {
-    id: 'openai/gpt-6-sol:cloud',
-    name: 'OpenAI GPT-6 Sol (Experiential Labs)',
-    type: 'cloud',
-    provider: 'Experiential Labs',
-    description: 'OpenAI GPT-6 Sol — next-generation reasoning & website coding model (ready to use)'
-  },
-  {
-    id: 'openai/gpt-6-luna:cloud',
-    name: 'OpenAI GPT-6 Luna (Experiential Labs)',
-    type: 'cloud',
-    provider: 'Experiential Labs',
-    description: 'OpenAI GPT-6 Luna — ultra-fast next-gen GPT-6 model (ready to use)'
-  },
-  {
-    id: 'openai/gpt-6-astra:cloud',
-    name: 'OpenAI GPT-6 Astra (Experiential Labs)',
-    type: 'cloud',
-    provider: 'Experiential Labs',
-    description: 'OpenAI GPT-6 Astra — flagship model (auto-routes to Sol if locked without credits)'
-  },
-  {
     id: 'groq/openai/gpt-oss-120b:cloud',
-    name: 'OpenAI GPT-OSS 120B (Groq)',
+    name: 'OpenAI GPT-OSS 120B (Groq — Recommended)',
     type: 'cloud',
     provider: 'Groq',
-    description: 'OpenAI GPT-OSS 120B — open-weight flagship on Groq LPU'
+    description: 'OpenAI GPT-OSS 120B — blazing fast (~500 tokens/sec) on Groq LPU'
   },
   {
     id: 'groq/openai/gpt-oss-20b:cloud',
@@ -72,6 +55,27 @@ const STATIC_MODEL_OPTIONS = [
     type: 'cloud',
     provider: 'Groq',
     description: 'Alibaba Qwen 3.8 27B — high-performance open model on Groq LPU'
+  },
+  {
+    id: 'openai/gpt-6-astra:cloud',
+    name: 'OpenAI GPT-6 Astra (Experiential Labs)',
+    type: 'cloud',
+    provider: 'Experiential Labs',
+    description: 'OpenAI GPT-6 Astra — flagship model (auto-routes to Groq if key expired)'
+  },
+  {
+    id: 'openai/gpt-6-sol:cloud',
+    name: 'OpenAI GPT-6 Sol (Experiential Labs)',
+    type: 'cloud',
+    provider: 'Experiential Labs',
+    description: 'OpenAI GPT-6 Sol — next-generation reasoning & website coding model'
+  },
+  {
+    id: 'openai/gpt-6-luna:cloud',
+    name: 'OpenAI GPT-6 Luna (Experiential Labs)',
+    type: 'cloud',
+    provider: 'Experiential Labs',
+    description: 'OpenAI GPT-6 Luna — ultra-fast next-gen GPT-6 model'
   }
 ];
 
@@ -86,7 +90,10 @@ const generateLimiter = rateLimit({
 });
 
 // Local Ollama model used whenever a cloud model is unavailable or fails.
-const LOCAL_FALLBACK_MODEL = process.env.OLLAMA_MODEL || 'qwen3:14b';
+// On cloud environments (Vercel) or when Ollama is unavailable, fallback to Groq.
+const LOCAL_FALLBACK_MODEL = (process.env.VERCEL || process.env.NODE_ENV === 'production')
+  ? 'groq/openai/gpt-oss-120b:cloud'
+  : (process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud');
 
 const MAX_PROMPT_LENGTH = 10_000;
 
