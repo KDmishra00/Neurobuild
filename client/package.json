@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:vercel": "vite build",
+    "build": "vite build && node -e \"fs.writeFileSync('dist/app.cjs', 'module.exports = require(\\\"../../server.js\\\");\\n')\"",
+    "build:vercel": "vite build && node -e \"fs.writeFileSync('dist/app.cjs', 'module.exports = require(\\\"../../server.js\\\");\\n')\"",
     "lint": "oxlint",
     "preview": "vite preview"
   },
