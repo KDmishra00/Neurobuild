@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neurobuild — AI Website Builder</title>
+<meta name="description" content="Transform your ideas into stunning websites powered by AI in seconds.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --accent3: #a78bfa;
+  --accent-dim: #4f46e5;
+  --accent-glow: rgba(99, 102, 241, 0.2);
+  --accent-soft: rgba(99, 102, 241, 0.08);
+  --bg: #06060a;
+  --surface: rgba(14, 14, 20, 0.7);
+  --surface2: rgba(22, 22, 32, 0.5);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --text: #f0f0f5;
+  --text2: #9898a8;
+  --text3: #5a5a6e;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-full: 9999px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --display: 'Outfit', 'Inter', sans-serif;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* === ANIMATED MESH BACKGROUND === */
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  animation: orbDrift var(--duration) var(--delay) ease-in-out infinite alternate;
+}
+
+.orb-1 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3), transparent 70%);
+  top: -15%; left: 30%;
+  --duration: 12s; --delay: 0s;
+}
+
+.orb-2 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.2), transparent 70%);
+  top: 10%; right: -5%;
+  --duration: 15s; --delay: -3s;
+}
+
+.orb-3 {
+  width: 350px; height: 350px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.2), transparent 70%);
+  bottom: -10%; left: -5%;
+  --duration: 18s; --delay: -6s;
+}
+
+@keyframes orbDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(40px, -30px) scale(1.15); }
+}
+
+/* Grid pattern overlay */
+.grid-pattern {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, black 20%, transparent 70%);
+  pointer-events: none;
+}
+
+/* === TOPBAR === */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  z-index: 100;
+  background: rgba(6, 6, 10, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.logo:hover { opacity: 0.85; }
+
+.logo-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.4);
+}
+
+.logo-text {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--text);
+}
+
+.logo-text span {
+  background: linear-gradient(135deg, var(--accent2), var(--accent3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-link {
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+.sign-in-btn {
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.sign-in-btn:hover {
+  background: var(--accent-dim);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+/* === HERO === */
+.hero-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 130px 24px 60px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-content {
+  max-width: 720px;
+  width: 100%;
+  text-align: center;
+}
+
+/* Badge pill */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 6px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent2);
+  margin-bottom: 28px;
+  animation: fadeSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Heading */
+.hero-heading {
+  font-family: var(--display);
+  font-size: clamp(36px, 5.5vw, 56px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 18px;
+  animation: fadeSlideIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.hero-heading .gradient-word {
+  background: linear-gradient(135deg, var(--accent2), var(--accent3), #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Subtitle */
+.hero-subtitle {
+  font-size: 16px;
+  color: var(--text2);
+  line-height: 1.7;
+  margin-bottom: 44px;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+  font-weight: 400;
+  animation: fadeSlideIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === PROMPT SECTION === */
+.prompt-section {
+  animation: fadeSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.prompt-container {
+  max-width: 580px;
+  width: 100%;
+  margin: 0 auto 24px;
+  position: relative;
+}
+
+.prompt-box {
+  background: rgba(12, 12, 18, 0.8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.prompt-box:focus-within {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 200px;
+  resize: none;
+  padding: 16px 18px 8px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.prompt-textarea::placeholder {
+  color: var(--text3);
+}
+
+.prompt-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.prompt-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.prompt-tool-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.prompt-tool-btn:hover {
+  color: var(--text2);
+  background: rgba(255,255,255,0.04);
+}
+
+.prompt-tool-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.prompt-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+}
+
+.prompt-send-btn:hover {
+  background: var(--accent-dim);
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.prompt-send-btn:active {
+  transform: scale(0.96);
+}
+
+.prompt-send-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* === SUGGESTION CHIPS === */
+.chips-section {
+  animation: fadeSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both;
+}
+
+.chips-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text3);
+  margin-bottom: 14px;
+}
+
+.chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: rgba(14, 14, 20, 0.5);
+  color: var(--text2);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.suggestion-chip:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.suggestion-chip.active {
+  color: var(--accent2);
+  border-color: rgba(99, 102, 241, 0.3);
+  background: var(--accent-soft);
+}
+
+.chip-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* === BOTTOM STATS === */
+.social-proof {
+  margin-top: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  animation: fadeSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text), var(--text2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+}
+
+/* === LOADING STATE === */
+.prompt-send-btn.loading {
+  pointer-events: none;
+  position: relative;
+}
+
+.prompt-send-btn.loading svg { opacity: 0; }
+
+.prompt-send-btn.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+/* === RESPONSIVE === */
+@media (max-width: 640px) {
+  .topbar { padding: 0 16px; }
+  .hero-wrapper { padding: 100px 16px 48px; }
+  .hero-heading { font-size: 30px; letter-spacing: -1px; }
+  .hero-subtitle { font-size: 14px; }
+  .suggestion-chip { padding: 7px 14px; font-size: 11.5px; }
+  .nav-right .nav-link { display: none; }
+  .social-proof { gap: 20px; }
+  .stat-number { font-size: 18px; }
+}
+
+@media (max-width: 400px) {
+  .social-proof { flex-direction: column; gap: 16px; }
+  .stat-divider { width: 40px; height: 1px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Animated Background -->
+<div class="bg-canvas">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+<div class="grid-pattern"></div>
+
+<!-- Topbar -->
+<header class="topbar">
+  <a href="/" class="logo">
+    <div class="logo-icon">N</div>
+    <div class="logo-text">Neuro<span>build</span></div>
+  </a>
+  <nav class="nav-right">
+    <a href="/templates.html" class="nav-link">Templates</a>
+    <a href="/login.html" class="sign-in-btn" id="authBtn">Sign in</a>
+  </nav>
+</header>
+
+<!-- Hero -->
+<main class="hero-wrapper">
+  <div class="hero-content">
+    <!-- Badge -->
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      AI-powered website builder
+    </div>
+
+    <h1 class="hero-heading">
+      Describe it. We <span class="gradient-word">build</span> it.
+    </h1>
+
+    <p class="hero-subtitle">
+      Tell us what you need in plain English — our AI creates production-ready,
+      responsive websites in seconds. No templates. No limits.
+    </p>
+
+    <!-- Prompt Input -->
+    <div class="prompt-section">
+      <div class="prompt-container">
+        <div class="prompt-box">
+          <textarea
+            id="promptInput"
+            class="prompt-textarea"
+            placeholder="A modern SaaS landing page with hero section, pricing table, and dark theme..."
+            maxlength="10000"
+            rows="2"
+          ></textarea>
+          <div class="prompt-bottom">
+            <div class="prompt-tools">
+              <!-- Attachment -->
+              <button class="prompt-tool-btn" title="Attach reference image">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+              </button>
+              <!-- Settings -->
+              <button class="prompt-tool-btn" title="Generation settings" onclick="window.location.href='/settings.html'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                  <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                  <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+                  <line x1="17" y1="16" x2="23" y2="16"/>
+                </svg>
+              </button>
+            </div>
+            <!-- Send -->
+            <button class="prompt-send-btn" id="sendBtn" title="Generate website" onclick="handleGenerate()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Ideas -->
+      <div class="chips-section">
+        <div class="chips-label">Quick ideas</div>
+        <div class="chips-container">
+          <button class="suggestion-chip" data-prompt="A modern e-commerce storefront with product grid, shopping cart, checkout flow, customer reviews, and responsive mobile design.">
+            <span class="chip-icon">🛒</span> E-commerce store
+          </button>
+          <button class="suggestion-chip" data-prompt="A developer portfolio with animated hero, interactive project cards, tech stack showcase, GitHub integration, and a contact form.">
+            <span class="chip-icon">💻</span> Dev portfolio
+          </button>
+          <button class="suggestion-chip" data-prompt="A SaaS landing page with bold hero, feature comparison grid, three-tier pricing table, customer testimonials, and CTA section.">
+            <span class="chip-icon">🚀</span> SaaS landing
+          </button>
+          <button class="suggestion-chip" data-prompt="A restaurant website with fullscreen food hero, interactive menu with categories, chef spotlight, reservation booking form, and location map.">
+            <span class="chip-icon">🍽️</span> Restaurant
+          </button>
+          <button class="suggestion-chip" data-prompt="An online education platform with course catalog cards, instructor profiles, student progress dashboard, enrollment CTA, and FAQ.">
+            <span class="chip-icon">🎓</span> Education
+          </button>
+          <button class="suggestion-chip" data-prompt="A photography portfolio with masonry gallery, fullscreen lightbox, about section with bio, client list, and booking inquiry form.">
+            <span class="chip-icon">📸</span> Photography
+          </button>
+          <button class="suggestion-chip" data-prompt="A clean blog with article cards, category filtering, reading time estimates, newsletter signup, and dark/light theme toggle.">
+            <span class="chip-icon">✍️</span> Blog
+          </button>
+          <button class="suggestion-chip" data-prompt="A fitness gym website with bold dark design, class schedule table, membership plan comparison, trainer profiles, and transformation gallery.">
+            <span class="chip-icon">🏋️</span> Fitness gym
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+</main>
+
+<script>
+  const token = localStorage.getItem('token');
+  const authBtn = document.getElementById('authBtn');
+
+  // If logged in, change "Sign in" to "Dashboard"
+  if (token) {
+    authBtn.textContent = 'Dashboard';
+    authBtn.href = '/dashboard.html';
+  }
+
+  // Textarea auto-resize
+  const textarea = document.getElementById('promptInput');
+  textarea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+  });
+
+  // Enter to send (Shift+Enter for newline)
+  textarea.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleGenerate();
+    }
+  });
+
+  // Chip click
+  document.querySelectorAll('.suggestion-chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      document.querySelectorAll('.suggestion-chip').forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+      textarea.value = this.dataset.prompt;
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+      textarea.focus();
+    });
+  });
+
+  // Generate
+  function handleGenerate() {
+    const prompt = textarea.value.trim();
+    if (!prompt) {
+      textarea.focus();
+      const box = textarea.closest('.prompt-box');
+      box.style.animation = 'shake 0.35s ease';
+      setTimeout(() => box.style.animation = '', 350);
+      return;
+    }
+
+    if (!token) {
+      localStorage.setItem('pendingPrompt', prompt);
+      window.location.href = '/login.html';
+      return;
+    }
+
+    localStorage.setItem('templatePrompt', prompt);
+    window.location.href = '/dashboard.html';
+  }
+
+  // Shake keyframes
+  const s = document.createElement('style');
+  s.textContent = `@keyframes shake {
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-4px)}
+    40%{transform:translateX(4px)}
+    60%{transform:translateX(-3px)}
+    80%{transform:translateX(3px)}
+  }`;
+  document.head.appendChild(s);
+
+  // If returning from login with pending prompt
+  if (token && localStorage.getItem('pendingPrompt')) {
+    localStorage.setItem('templatePrompt', localStorage.getItem('pendingPrompt'));
+    localStorage.removeItem('pendingPrompt');
+    window.location.href = '/dashboard.html';
+  }
+</script>
+</body>
+</html>

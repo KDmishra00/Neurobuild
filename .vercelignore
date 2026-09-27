@@ -1,0 +1,14 @@
+# Don't deploy these to Vercel
+node_modules
+.env
+.env.local
+.git
+test
+scripts
+.claude
+.DS_Store
+docker-compose.yml
+Dockerfile
+.dockerignore
+*.md
+!README.md

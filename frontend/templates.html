@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Templates — Neurobuild</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common.css">
+<style>
+  /* Filter chips */
+  .filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .chip {
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+  }
+  .chip:hover { color: var(--text); border-color: var(--border-hover); background: var(--surface2); }
+  .chip.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+  }
+
+  .template-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: var(--transition);
+    cursor: pointer;
+    backdrop-filter: var(--glass-backdrop);
+    display: flex;
+    flex-direction: column;
+  }
+  .template-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow);
+  }
+
+  .card-thumb {
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-thumb::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--thumb-bg, linear-gradient(135deg, #111, #1a1a1a));
+  }
+  .card-thumb span { position: relative; z-index: 1; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4)); }
+
+  .card-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+  }
+
+  .card-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+  .card-body h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+  .card-body p { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 14px; flex: 1; }
+
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .meta-tag {
+    padding: 3px 9px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+  }
+
+  .card-actions { display: flex; gap: 8px; margin-top: auto; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="/dashboard.html" class="logo">
+      <div class="logo-icon">N</div>
+      Neuro<span>build</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/dashboard.html" class="nav-link">Builder</a>
+      <a href="/templates.html" class="nav-link active">Templates</a>
+      <a href="/settings.html" class="nav-link">Settings</a>
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <a href="/dashboard.html" class="back-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Builder
+    </a>
+  </div>
+</div>
+
+<div class="page" style="max-width: 1100px;">
+  <div class="page-header" style="margin-bottom: 32px;">
+    <h1 class="page-title">Website Templates</h1>
+    <p class="page-subtitle">Pick a starting point and customize it effortlessly with AI</p>
+  </div>
+
+  <div class="filters">
+    <button class="chip active" onclick="filterTemplates('all',this)">All</button>
+    <button class="chip" onclick="filterTemplates('business',this)">Business</button>
+    <button class="chip" onclick="filterTemplates('portfolio',this)">Portfolio</button>
+    <button class="chip" onclick="filterTemplates('ecommerce',this)">E-commerce</button>
+    <button class="chip" onclick="filterTemplates('blog',this)">Blog</button>
+    <button class="chip" onclick="filterTemplates('landing',this)">Landing page</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  // Check authentication
+  if (!localStorage.getItem('token')) {
+    window.location.href = 'login.html';
+  }
+
+  const templates = [
+    { id:1, icon:'🍽', name:'Restaurant', desc:'Dark-themed restaurant with hero, menu cards, gallery, and booking form.', tags:['business'], chips:['Hero','Menu','Booking'], bg:'linear-gradient(135deg,#2e1005,#4a1c09)', badge:'popular' },
+    { id:2, icon:'💼', name:'Developer portfolio', desc:'Minimal portfolio with skills, projects grid, and contact form.', tags:['portfolio'], chips:['Projects','Skills','Contact'], bg:'linear-gradient(135deg,#0e1338,#1c2666)', badge:'popular' },
+    { id:3, icon:'🛍', name:'E-commerce landing', desc:'Product showcase with cards, pricing table, and testimonials.', tags:['ecommerce','landing'], chips:['Products','Pricing','Reviews'], bg:'linear-gradient(135deg,#062b18,#0e5230)', badge:'free' },
+    { id:4, icon:'✍', name:'Blog homepage', desc:'Clean blog layout with article cards and category sidebar.', tags:['blog'], chips:['Articles','Categories','Search'], bg:'linear-gradient(135deg,#1f0c38,#3a1769)', badge:'free' },
+    { id:5, icon:'🚀', name:'SaaS landing', desc:'High-converting page with features, pricing tiers, and FAQ.', tags:['landing','business'], chips:['Features','Pricing','FAQ'], bg:'linear-gradient(135deg,#0c2238,#174369)', badge:'popular' },
+    { id:6, icon:'📸', name:'Photo portfolio', desc:'Visual-first portfolio with gallery, lightbox, and about section.', tags:['portfolio'], chips:['Gallery','Lightbox','About'], bg:'linear-gradient(135deg,#382d0c,#695417)', badge:'free' },
+    { id:7, icon:'🏥', name:'Medical clinic', desc:'Professional clinic site with services, team, and booking.', tags:['business'], chips:['Services','Team','Booking'], bg:'linear-gradient(135deg,#0c3838,#176969)', badge:'free' },
+    { id:8, icon:'🎓', name:'Education platform', desc:'Course listing with cards, instructor profiles, and CTA.', tags:['landing','business'], chips:['Courses','Instructors','CTA'], bg:'linear-gradient(135deg,#380c38,#691769)', badge:'free' },
+    { id:9, icon:'🏋', name:'Fitness gym', desc:'Bold gym site with plans, schedule, and trainer profiles.', tags:['business'], chips:['Plans','Schedule','Trainers'], bg:'linear-gradient(135deg,#380c10,#691720)', badge:'popular' },
+    { id:10, icon:'🎨', name:'Creative agency', desc:'Bold agency site with animated hero and portfolio grid.', tags:['portfolio','business'], chips:['Hero','Portfolio','Clients'], bg:'linear-gradient(135deg,#170c38,#2f1769)', badge:'popular' },
+    { id:11, icon:'☕', name:'Cafe & bakery', desc:'Warm cafe website with menu, story section, and location.', tags:['business'], chips:['Menu','Story','Location'], bg:'linear-gradient(135deg,#38200c,#693c17)', badge:'free' },
+    { id:12, icon:'💻', name:'Tech startup', desc:'Modern startup page with demo, integrations, and stats.', tags:['landing','business'], chips:['Demo','Integrations','Stats'], bg:'linear-gradient(135deg,#0c1938,#173169)', badge:'free' },
+  ];
+
+  let activeFilter = 'all';
+
+  function filterTemplates(filter, el) {
+    activeFilter = filter;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderTemplates();
+  }
+
+  function renderTemplates() {
+    const filtered = activeFilter === 'all' ? templates : templates.filter(t => t.tags.includes(activeFilter));
+    document.getElementById('grid').innerHTML = filtered.map(t => `
+      <div class="template-card" onclick="useTemplate(${t.id})">
+        <div class="card-thumb" style="--thumb-bg:${t.bg}">
+          <span>${t.icon}</span>
+          <span class="badge ${t.badge==='popular'?'badge-primary':'badge-success'} card-badge">${t.badge==='popular'?'Popular':'Free'}</span>
+        </div>
+        <div class="card-body">
+          <h3>${t.name}</h3>
+          <p>${t.desc}</p>
+          <div class="card-tags">${t.chips.map(c=>`<span class="meta-tag">${c}</span>`).join('')}</div>
+          <div class="card-actions">
+            <button class="btn btn-primary" style="width: 100%; padding: 8px;" onclick="event.stopPropagation();useTemplate(${t.id})">Use template →</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function useTemplate(id) {
+    const prompts = {
+      1: 'A modern restaurant website with dark theme, hero section with background image, menu section with dish cards including price and description, photo gallery, reservation/booking form, and footer with contact details.',
+      2: 'A minimal developer portfolio website with animated hero, about section, skills list with progress bars, projects grid with GitHub links, and contact form.',
+      3: 'An e-commerce landing page for a clothing brand with full-width hero, product cards with hover effects, features section, pricing table, customer testimonials, and newsletter signup.',
+      4: 'A clean blog homepage with article cards showing title, date, category tag, and excerpt, sidebar with categories and recent posts, search bar at top, and pagination.',
+      5: 'A SaaS product landing page with animated hero, 3-column features section, comparison pricing table with 3 tiers, FAQ accordion, and a strong call-to-action section.',
+      6: 'A photographer portfolio with fullscreen hero image, masonry photo gallery with lightbox popup, about section with profile photo, services offered, and contact form.',
+      7: 'A medical clinic website with professional design, services section with icons, doctors team with photos and specializations, appointment booking form, and patient testimonials.',
+      8: 'An online education platform landing page with course listing cards, instructor profiles, student stats counter, enrollment call-to-action, and FAQ section.',
+      9: 'A fitness gym website with bold dark design, membership plans comparison, weekly class schedule table, personal trainer profiles, and before/after transformation gallery.',
+      10: 'A creative agency website with bold typography, animated gradient hero, portfolio grid with hover overlays, client logos section, team bios, and contact page.',
+      11: 'A warm cafe and bakery website with cozy color scheme, featured menu items with images, our story section, Instagram-style photo feed, and Google Maps location embed.',
+      12: 'A tech startup landing page with animated product demo mockup, integration logos grid, growth stats counter, investor quote section, team page, and waitlist signup form.',
+    };
+    localStorage.setItem('templatePrompt', prompts[id] || templates.find(x=>x.id===id).desc);
+    window.location.href = 'dashboard.html';
+  }
+
+  renderTemplates();
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "neurobuilt",
+  "version": "2.0.0",
+  "description": "Neurobuild — Autonomous AI website generation platform with multi-turn chat, live preview, and analytics",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node scripts/check.js",
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:unit": "jest test/unit --forceExit",
+    "test:logic": "jest test/unit/services test/unit/middleware --runInBand",
+    "test:integration": "jest test/integration --forceExit --detectOpenHandles",
+    "test:watch": "jest --watch --forceExit"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 15000
+  },
+  "keywords": ["ai", "website-builder", "ollama"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.3",
+    "morgan": "^1.10.1",
+    "node-fetch": "^3.3.2",
+    "undici": "^8.8.0",
+    "validator": "^13.15.26"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.4.0",
+    "supertest": "^7.1.0"
+  }
+}

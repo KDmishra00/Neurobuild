@@ -1,0 +1,2319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neurobuild — AI Website Builder</title>
+<meta name="description" content="Build beautiful websites with AI in seconds. No coding required.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #09090b;
+  --surface: rgba(15, 15, 18, 0.75);
+  --surface-solid: #0f0f12;
+  --surface2: #18181b;
+  --surface3: #222227;
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.16);
+  --text: #fafafa;
+  --text2: #a1a1aa;
+  --text3: #71717a;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --green: #10b981;
+  --red: #f43f5e;
+  --orange: #f59e0b;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --topbar-bg: rgba(15, 15, 18, 0.85);
+}
+
+body.light-mode {
+  --bg: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-solid: #ffffff;
+  --surface2: #f1f5f9;
+  --surface3: #e2e8f0;
+  --border: rgba(0, 0, 0, 0.08);
+  --border2: rgba(0, 0, 0, 0.16);
+  --text: #0f172a;
+  --text2: #475569;
+  --text3: #94a3b8;
+  --accent-glow: rgba(99, 102, 241, 0.08);
+  --topbar-bg: rgba(255, 255, 255, 0.85);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+body.hero-visible { overflow-y: auto; }
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* === TOPBAR === */
+.topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  flex-shrink: 0;
+  z-index: 100;
+  position: relative;
+}
+.topbar-left { display: flex; align-items: center; gap: 20px; }
+.logo {
+  font-size: 15px; font-weight: 700; letter-spacing: -0.5px;
+  color: var(--text); text-decoration: none;
+  display: flex; align-items: center; gap: 7px;
+}
+.logo-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+}
+.logo span { color: var(--accent2); }
+
+.nav-links { display: flex; gap: 1px; }
+.nav-link {
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  color: var(--text3); text-decoration: none; border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.nav-link:hover { color: var(--text2); }
+.nav-link.active { color: var(--text); background: var(--surface2); }
+
+.topbar-right { display: flex; align-items: center; gap: 8px; position: relative; }
+
+.icon-btn {
+  width: 32px; height: 32px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-size: 0;
+}
+.icon-btn:hover { color: var(--text); background: var(--surface2); }
+
+.profile-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  font-family: var(--font); font-size: 11px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.profile-btn:hover { opacity: 0.9; }
+
+.dropdown {
+  position: absolute; top: 42px; right: 0; width: 200px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px;
+  display: none; z-index: 200;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+.dropdown.open { display: block; }
+.dropdown-header { padding: 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.dropdown-header .name { font-size: 12px; font-weight: 600; color: var(--text); }
+.dropdown-header .email { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; font-size: 12px; color: var(--text2);
+  text-decoration: none; border-radius: var(--radius-sm); transition: all 0.1s;
+  border: none; background: none; width: 100%; cursor: pointer;
+  font-family: var(--font); text-align: left;
+}
+.dropdown-item:hover { background: var(--surface3); color: var(--text); }
+.dropdown-item.danger { color: var(--red); }
+.dropdown-item.danger:hover { background: rgba(239,68,68,0.1); }
+.dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* === OVERLAYS === */
+.error-overlay {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--surface2);
+  z-index: 20; gap: 8px;
+}
+.error-overlay.visible { display: flex; }
+.error-icon { font-size: 24px; }
+.error-text { font-size: 13px; color: var(--red); font-weight: 500; }
+.error-detail { font-size: 11px; color: var(--text3); max-width: 360px; text-align: center; }
+.retry-btn {
+  margin-top: 6px; padding: 7px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--red);
+  background: rgba(239,68,68,0.08);
+  color: var(--red);
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.retry-btn:hover { background: rgba(239,68,68,0.15); }
+
+.loading-overlay {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(24,24,27,0.8);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+}
+.loading-overlay.visible { display: flex; }
+.loading-spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+
+
+/* === MAIN LAYOUT === */
+.app-container {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 48px);
+  gap: 16px;
+  padding: 16px;
+}
+
+/* === SIDEBAR (LEFT) === */
+.sidebar {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.sidebar-panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sidebar-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+  min-height: 100px;
+}
+.sidebar-input:focus {
+  border-color: var(--accent);
+}
+.attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.attach-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.prompt-files-preview {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.prompt-file-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text2);
+}
+.prompt-file-item img {
+  width: 16px; height: 16px; object-fit: cover; border-radius: 2px;
+}
+.remove-file {
+  background: transparent; border: none; color: var(--text3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  padding: 0; font-size: 10px;
+}
+.remove-file:hover { color: var(--red); }
+.attach-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--border);
+}
+.generate-btn-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: #db6b45; /* Orange from screenshot */
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.generate-btn-new:hover {
+  background: #c55a37;
+}
+.generate-btn-new:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.model-select-new {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-solid);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* === MAIN CONTENT (RIGHT) === */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.preview-container {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.preview-header, .code-header {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.preview-pane-new {
+  flex: 1;
+  position: relative;
+  background: #fff; /* iframe needs white background usually */
+}
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text3);
+  background: var(--surface2);
+}
+.empty-state svg {
+  color: var(--border2);
+}
+.empty-state p {
+  font-size: 13px;
+}
+
+.code-container {
+  height: 250px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.code-tabs-new {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+.code-tab-new {
+  padding: 10px 24px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-right: 1px solid var(--border);
+}
+.code-tab-new.active {
+  color: var(--text);
+  background: var(--surface3);
+}
+.code-editor-new {
+  flex: 1;
+  padding: 16px;
+  background: var(--surface-solid);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: auto;
+  margin: 0;
+}
+
+/* Projects Modal */
+.projects-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+.projects-modal.visible {
+  display: flex;
+}
+.projects-modal-content {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.projects-modal-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.projects-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+
+/* === CHAT PANEL === */
+.chat-toggle { position: relative; }
+.chat-toggle .badge { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: none; }
+.chat-toggle.has-messages .badge { display: block; }
+
+.chat-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 380px; z-index: 50;
+  background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.chat-panel.open { transform: translateX(0); }
+
+.chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.chat-header h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.chat-header-actions { display: flex; gap: 4px; }
+.chat-close {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  padding: 4px; border-radius: 4px; font-size: 14px; line-height: 1;
+}
+.chat-close:hover { color: var(--text); background: var(--surface2); }
+
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.chat-msg {
+  max-width: 88%; padding: 10px 14px; border-radius: 12px;
+  font-size: 13px; line-height: 1.55; word-wrap: break-word;
+}
+.chat-msg.user {
+  align-self: flex-end; background: var(--accent); color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant {
+  align-self: flex-start; background: var(--surface2); color: var(--text);
+  border-bottom-left-radius: 4px; border: 1px solid var(--border);
+}
+.chat-msg.assistant .apply-html-btn {
+  display: inline-block; margin-top: 8px; padding: 4px 10px;
+  font-size: 11px; font-weight: 600; background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer; font-family: var(--font);
+}
+.chat-msg.assistant .apply-html-btn:hover { background: var(--accent2); }
+.chat-typing { color: var(--text3); font-size: 12px; font-style: italic; padding: 4px 0; }
+
+.chat-input-area {
+  display: flex; gap: 6px; padding: 10px 14px;
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+.chat-input {
+  flex: 1; padding: 8px 12px; font-size: 13px; font-family: var(--font);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); outline: none; resize: none;
+  min-height: 36px; max-height: 120px;
+}
+.chat-input:focus { border-color: var(--accent); }
+.chat-input::placeholder { color: var(--text3); }
+.chat-send {
+  padding: 8px 14px; font-size: 12px; font-weight: 600; font-family: var(--font);
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  cursor: pointer; white-space: nowrap; align-self: flex-end;
+}
+.chat-send:hover { background: var(--accent2); }
+.chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.chat-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: var(--text3); gap: 8px; padding: 20px;
+}
+.chat-empty .icon { font-size: 32px; opacity: 0.4; }
+.chat-empty p { font-size: 12px; text-align: center; line-height: 1.5; }
+
+/* AI Tools dropdown */
+.ai-tools-wrap { position: relative; }
+.ai-tools-menu {
+  display: none; position: absolute; top: 100%; right: 0; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px; min-width: 180px; z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.ai-tools-menu.open { display: block; }
+.ai-tools-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--text2);
+  background: none; border: none; border-radius: 6px; cursor: pointer;
+  font-family: var(--font); text-align: left;
+}
+.ai-tools-item:hover { background: var(--surface2); color: var(--text); }
+.ai-tools-item .emoji { font-size: 14px; }
+
+/* Calculator Modal */
+.calc-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 1000; justify-content: center; align-items: center;
+  backdrop-filter: blur(4px);
+}
+.calc-overlay.open { display: flex; }
+.calc-modal {
+  width: 340px; background: var(--surface-solid); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: calcFadeIn 0.2s ease;
+}
+@keyframes calcFadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.calc-display {
+  background: var(--surface2); border-radius: 12px; padding: 16px;
+  margin-bottom: 12px; text-align: right; min-height: 80px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.calc-expr { color: var(--text3); font-size: 14px; min-height: 20px; font-family: var(--mono); word-break: break-all; }
+.calc-result { color: var(--text); font-size: 32px; font-weight: 300; font-family: var(--mono); word-break: break-all; }
+.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.calc-btn {
+  height: 52px; border: none; border-radius: 10px; font-size: 16px; font-weight: 500;
+  cursor: pointer; transition: all 0.12s ease; color: var(--text);
+  background: var(--surface2); font-family: var(--font);
+}
+.calc-btn:hover { background: var(--surface3); transform: translateY(-1px); }
+.calc-btn:active { transform: translateY(0); }
+.calc-btn.op { background: rgba(99, 102, 241, 0.2); color: var(--accent2); }
+.calc-btn.op:hover { background: rgba(99, 102, 241, 0.35); }
+.calc-btn.eq { background: linear-gradient(135deg, var(--accent), #06b6d4); color: #fff; grid-column: span 2; }
+.calc-btn.eq:hover { background: linear-gradient(135deg, var(--accent2), #22d3ee); }
+.calc-btn.clear { background: rgba(244, 63, 94, 0.15); color: var(--red); }
+.calc-btn.clear:hover { background: rgba(244, 63, 94, 0.3); }
+.calc-btn.wide { grid-column: span 2; }
+.calc-history {
+  margin-top: 10px; max-height: 100px; overflow-y: auto; padding: 8px;
+  background: var(--surface2); border-radius: 8px;
+}
+.calc-history div { color: var(--text3); font-size: 12px; padding: 2px 0; text-align: right; font-family: var(--mono); }
+.calc-close {
+  position: absolute; top: 12px; right: 12px; background: none; border: none;
+  color: var(--text3); cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: 6px;
+}
+.calc-close:hover { color: var(--text); background: var(--surface2); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .prompt-bar { flex-direction: column; }
+  .prompt-bar input { border-radius: var(--radius); border-right: 1px solid var(--border); }
+  .generate-btn { border-radius: var(--radius); justify-content: center; }
+  .chat-panel { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Calculator Modal -->
+<div class="calc-overlay" id="calcOverlay" onclick="if(event.target===this)closeCalc()">
+  <div class="calc-modal" style="position:relative">
+    <button class="calc-close" onclick="closeCalc()">✕</button>
+    <div class="calc-display">
+      <div class="calc-expr" id="calcExpr"></div>
+      <div class="calc-result" id="calcResult">0</div>
+    </div>
+    <div class="calc-grid" id="calcButtons"></div>
+    <div class="calc-history" id="calcHistory"></div>
+  </div>
+</div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="dashboard.html" class="logo">
+      <div class="logo-icon">N</div>
+      Neuro<span>build</span>
+    </a>
+    <nav class="nav-links">
+      <a href="dashboard.html" class="nav-link active">Build</a>
+      <a href="#" class="nav-link" onclick="document.getElementById('projectsModal').classList.add('visible'); return false;">Projects</a>
+      <a href="templates.html" class="nav-link">Templates</a>
+    </nav>
+  </div>
+
+  <div class="topbar-right">
+    <button class="icon-btn" onclick="toggleTheme()" id="themeToggle" title="Toggle Theme">
+      <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+    <button class="icon-btn" onclick="toggleHistory()" title="History">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+    <button class="profile-btn" id="profileBtn" onclick="toggleDropdown()">U</button>
+    <div class="dropdown" id="dropdown">
+      <div class="dropdown-header">
+        <div class="name" id="dropdownName">User</div>
+        <div class="email" id="dropdownEmail">user@email.com</div>
+      </div>
+      <a href="profile.html" class="dropdown-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Profile
+      </a>
+      <a href="settings.html" class="dropdown-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </a>
+      <div class="dropdown-sep"></div>
+      <button class="dropdown-item danger" onclick="logout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Main -->
+<div class="app-container split-layout">
+  <!-- Left Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-panel">
+      <div class="panel-label">Prompt</div>
+      <textarea id="promptInput" class="sidebar-input" placeholder="Describe the website you want to build"></textarea>
+      <div id="promptFilePreview" class="prompt-files-preview"></div>
+      <input type="file" id="promptFileInput" multiple style="display:none" onchange="handlePromptFileSelect(event)">
+      <button class="attach-btn" onclick="document.getElementById('promptFileInput').click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        Attach images or files
+      </button>
+    </div>
+
+    <div class="sidebar-panel">
+      <div class="panel-label">Model</div>
+      <select id="modelSelect" class="model-select-new">
+        <option value="qwen3:14b">qwen3:14b (9.3 GB)</option>
+        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (4.7 GB)</option>
+      </select>
+    </div>
+
+    <button class="generate-btn-new" id="generateBtn" onclick="generateWebsite()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Generate
+    </button>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <!-- Live Preview -->
+    <div class="preview-container">
+      <div class="preview-header">
+        <span>Live preview</span>
+        <!-- Device Toggles -->
+        <div style="display:flex;gap:4px">
+          <button class="icon-btn active" onclick="setDevice('desktop', this)" title="Desktop"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></button>
+          <button class="icon-btn" onclick="setDevice('tablet', this)" title="Tablet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></button>
+          <button class="icon-btn" onclick="setDevice('mobile', this)" title="Mobile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></button>
+        </div>
+      </div>
+      <div class="preview-pane-new" id="previewPane">
+        <div class="empty-state" id="previewEmptyState">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <p>Your site renders here once generated</p>
+        </div>
+      </div>
+      
+      <!-- Overlays (Loading & Error) -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p style="margin-top:12px;font-size:13px;font-weight:500">Generating website...</p>
+      </div>
+      <div class="error-overlay" id="errorOverlay">
+        <div class="error-icon">⚠️</div>
+        <div class="error-text">Generation failed</div>
+        <div class="error-detail" id="errorDetail">Something went wrong.</div>
+        <button class="retry-btn" onclick="generateWebsite()">Retry</button>
+      </div>
+    </div>
+
+    <!-- Code Editor -->
+    <div class="code-container">
+      <div class="code-tabs-new">
+        <button class="code-tab-new active" onclick="switchCodeTab('html', this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          HTML
+        </button>
+        <button class="code-tab-new" onclick="switchCodeTab('css', this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          CSS
+        </button>
+        <button class="code-tab-new" onclick="switchCodeTab('js', this)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          JS
+        </button>
+        <div style="flex:1"></div>
+        <button class="code-tab-new" style="border-right:none" onclick="copyCurrentCode()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+      <pre class="code-editor-new"><code id="codeDisplayArea">&lt;!-- generated HTML will appear here --&gt;</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Projects Modal -->
+<div class="projects-modal" id="projectsModal">
+  <div class="projects-modal-content">
+    <div class="projects-modal-header">
+      <h3 style="font-size:16px;font-weight:600">My Projects</h3>
+      <button class="icon-btn" onclick="document.getElementById('projectsModal').classList.remove('visible')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="projects-modal-body">
+      <div class="projects-header" style="display:flex;justify-content:space-between;margin-bottom:16px">
+        <button onclick="createNewProject()" style="padding:6px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);cursor:pointer">+ New Project</button>
+      </div>
+      <div class="projects-grid" id="projectsGrid">
+        <div class="project-card" style="opacity:0.4">
+          <h4>No projects yet</h4>
+          <p>Generate to start</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Chat Panel -->
+    <div class="chat-panel" id="chatPanel">
+      <div class="chat-header">
+        <h3>💬 AI Chat</h3>
+        <div class="chat-header-actions">
+          <button class="chat-close" onclick="newConversation()" title="New conversation">＋</button>
+          <button class="chat-close" onclick="toggleChat()" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-empty">
+          <div class="icon">💬</div>
+          <p>Ask AI to build, modify, or explain your website. AI responses with HTML can be applied directly.</p>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask AI anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage()}"></textarea>
+        <button class="chat-send" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- History -->
+<div class="overlay-backdrop" id="overlayBackdrop" onclick="toggleHistory()"></div>
+<div class="history-panel" id="historyPanel">
+  <div class="history-header">
+    <h2>History</h2>
+    <button class="close-btn" onclick="toggleHistory()">✕</button>
+  </div>
+  <div class="history-empty" id="historyEmpty">
+    <span style="font-size:24px;opacity:0.3">📋</span>
+    <p>No generations yet</p>
+  </div>
+  <div class="history-list" id="historyList"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// === AUTH ===
+const token = localStorage.getItem('token');
+if (!token) window.location.href = 'login.html';
+
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+if (user.name) {
+  document.getElementById('profileBtn').textContent = user.name.charAt(0).toUpperCase();
+  document.getElementById('dropdownName').textContent = user.name;
+  document.getElementById('dropdownEmail').textContent = user.email || '';
+}
+
+// === STATE ===
+let generatedCode = { html: '', css: '', js: '' };
+let fullGeneratedHTML = '';
+let currentCodeTab = 'html';
+let isEditing = false;
+let lastPrompt = '';
+let pipelineMode = false;
+let parallelMode = false;
+let currentDevice = 'desktop';
+let currentProjectId = null;
+
+// === MODELS ===
+const FALLBACK_MODELS = [
+  { id: 'openai/gpt-6-astra:cloud', name: 'OpenAI GPT-6 Astra (Experiential Labs)' },
+  { id: 'openai/gpt-4o:cloud', name: 'OpenAI GPT-4o (OpenAI)' },
+  { id: 'openai/gpt-4o-mini:cloud', name: 'OpenAI GPT-4o Mini (OpenAI)' },
+  { id: 'qwen3:14b', name: 'Qwen3 14B (Local)' },
+  { id: 'qwen2.5-coder:7b', name: 'Qwen2.5 Coder 7B (Local)' }
+];
+
+function renderModelOptions(models) {
+  const select = document.getElementById('modelSelect');
+  let currentModel = user.settings?.model || 'qwen3:14b';
+  const exists = models.some(m => m.id === currentModel);
+  if (!exists) currentModel = models[0]?.id || 'qwen3:14b';
+  select.innerHTML = models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  select.value = currentModel;
+}
+
+async function loadModels() {
+  try {
+    const res = await fetch('/api/models', { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Model API failed: ${res.status}`);
+    const data = await res.json();
+    if (!data.models?.length) throw new Error('No models returned');
+    renderModelOptions(data.models);
+  } catch (e) {
+    console.log('Models load failed, using fallback list:', e);
+    renderModelOptions(FALLBACK_MODELS);
+  }
+}
+loadModels();
+
+// === DROPDOWN ===
+function toggleDropdown() {
+  document.getElementById('dropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.topbar-right')) {
+    document.getElementById('dropdown').classList.remove('open');
+  }
+});
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+
+// === QUICK TEMPLATES ===
+const templatePrompts = {
+  portfolio: 'A modern, minimal developer portfolio website with dark theme, animated hero section with name and title, about section, skills with progress bars, project cards with hover effects, and a contact form.',
+  landing: 'A high-converting SaaS landing page with gradient hero, feature cards with icons, pricing table with 3 tiers, customer testimonials carousel, FAQ accordion, and email signup form.',
+  business: 'A professional business website with hero banner, services section with icons, about us with team photos, client testimonials, stats counter, and contact form with Google Maps.',
+  restaurant: 'A modern restaurant website with dark theme, full-screen hero with background image, menu section with dish cards and prices, photo gallery grid, reservation booking form, and footer with hours.',
+  blog: 'A clean blog homepage with featured article hero, article cards showing title date category and excerpt, sidebar with categories and recent posts, search bar, and pagination buttons.',
+  ecommerce: 'An e-commerce landing page for a fashion brand with hero slideshow, product cards with hover effects and add to cart, featured collections, customer reviews, and newsletter signup.',
+  calculator: 'A beautiful modern calculator app with a clean display showing current and previous values, grid of buttons for digits 0-9 and operators +−×÷, percentage %, plus-minus ±, clear C, decimal point, and equals =. Use a light theme with soft shadows, rounded buttons with subtle purple/blue gradient on the equals button, pink/red on clear button. Include a history panel below showing recent calculations. Each button must have working onclick handlers. Write proper JavaScript with state variables (current, previous, operator) and explicit calculation functions — never use eval(). Add keyboard support for digits, operators, Enter, Escape, and Backspace.'
+};
+
+function useQuickTemplate(type) {
+  document.getElementById('promptInput').value = templatePrompts[type] || '';
+  updatePromptCount();
+  document.getElementById('promptInput').focus();
+}
+
+// === TOGGLES ===
+function togglePipeline() {
+  pipelineMode = !pipelineMode;
+  document.getElementById('pipelineToggle').classList.toggle('active', pipelineMode);
+  document.getElementById('modelSelect').disabled = pipelineMode;
+  const pc = document.getElementById('parallelToggleContainer');
+  if (!pipelineMode) {
+    parallelMode = false;
+    document.getElementById('parallelToggle').classList.remove('active');
+    pc.style.opacity = '0.4';
+    pc.style.pointerEvents = 'none';
+  } else {
+    pc.style.opacity = '1';
+    pc.style.pointerEvents = 'auto';
+  }
+}
+
+function toggleParallel() {
+  if (!pipelineMode) return;
+  parallelMode = !parallelMode;
+  document.getElementById('parallelToggle').classList.toggle('active', parallelMode);
+}
+
+// === GENERATION ===
+async function generateWebsite() {
+  const prompt = document.getElementById('promptInput').value.trim();
+  if (!prompt) {
+    showToast('Describe the website you want to build');
+    return;
+  }
+  lastPrompt = prompt;
+
+  // Switch to workspace
+  
+  
+  
+
+  const btn = document.getElementById('generateBtn');
+  const loading = document.getElementById('loadingOverlay');
+  const placeholder = document.getElementById('previewEmptyState');
+  const error = document.getElementById('errorOverlay');
+
+  btn.disabled = true;
+  loading.classList.add('visible');
+  if (placeholder) placeholder.style.display = 'none';
+  error.classList.remove('visible');
+
+  const singleLoading = document.getElementById('singleLoadingContent');
+  const stepper = document.getElementById('pipelineStepper');
+
+  if (pipelineMode) {
+    if (singleLoading) singleLoading.style.display = 'none';
+    if (stepper) stepper.classList.add('visible');
+    try { resetPipelineSteps(); } catch(e){}
+    await generateWithPipeline(prompt, loading, error, btn);
+  } else {
+    if (singleLoading) singleLoading.style.display = '';
+    if (stepper) stepper.classList.remove('visible');
+    await generateSingleModel(prompt, loading, error, btn);
+  }
+}
+
+async function generateSingleModel(prompt, loading, error, btn) {
+  try {
+    const model = document.getElementById('modelSelect').value || 'qwen3:14b';
+    // Get CSRF token
+    const csrfRes = await fetch('/api/auth/csrf-token', { credentials: 'include' });
+    const { csrfToken } = await csrfRes.json();
+    
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-CSRF-Token': csrfToken },
+      credentials: 'include',
+      body: JSON.stringify({ prompt, model })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to generate');
+    applyGeneratedSite(data.site, data.html);
+    loading.classList.remove('visible');
+    saveToHistory(prompt, fullGeneratedHTML);
+    await saveCurrentProject({ quiet: true });
+    showToast('Website generated ✨');
+  } catch (err) {
+    loading.classList.remove('visible');
+    error.classList.add('visible');
+    document.getElementById('errorDetail').textContent = err.message;
+    
+    // Auto-redirect if token is invalid/expired
+    if (err.message.includes('Invalid or expired token') || err.message.includes('401')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setTimeout(() => window.location.href = 'login.html', 1500);
+    }
+  }
+  btn.disabled = false;
+}
+
+async function generateWithPipeline(prompt, loading, error, btn) {
+  try {
+    // Get CSRF token
+    const csrfRes = await fetch('/api/auth/csrf-token', { credentials: 'include' });
+    const { csrfToken } = await csrfRes.json();
+    
+    const encodedPrompt = encodeURIComponent(prompt);
+    const mode = parallelMode ? 'parallel' : 'sequential';
+    const response = await fetch(`/api/stream-pipeline?prompt=${encodedPrompt}&mode=${mode}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'X-CSRF-Token': csrfToken },
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Pipeline request failed');
+    }
+
+    let completed = false;
+    let pipelineError = null;
+    await consumeSse(response, (data) => {
+      if (data.type === 'stage') {
+        updatePipelineStep(data.stage, data.status, data.preview, data.error, data.label);
+      } else if (data.type === 'done') {
+        completed = true;
+        applyGeneratedSite(data.site, data.html);
+        loading.classList.remove('visible');
+        saveToHistory(prompt, fullGeneratedHTML);
+        saveCurrentProject({ quiet: true });
+        showToast(data.fallback ? 'Generated (refiner skipped) ⚠️' : 'Pipeline complete 🚀');
+      } else if (data.type === 'error') {
+        pipelineError = new Error(data.error || 'Pipeline generation failed');
+      }
+    });
+
+    if (pipelineError) throw pipelineError;
+    if (!completed) throw new Error('Pipeline connection ended before generation completed');
+  } catch (err) {
+    loading.classList.remove('visible');
+    error.classList.add('visible');
+    document.getElementById('errorDetail').textContent = err.message;
+    
+    // Auto-redirect if token is invalid/expired
+    if (err.message.includes('Invalid or expired token') || err.message.includes('401')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setTimeout(() => window.location.href = 'login.html', 1500);
+    }
+  }
+  btn.disabled = false;
+}
+
+// EventSource cannot attach an Authorization header. Fetch keeps the token out
+// of the URL while retaining the same server-sent event protocol.
+async function consumeSse(response, onEvent) {
+  if (!response.body) throw new Error('Streaming is not supported by this browser');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = events.pop();
+      for (const event of events) {
+        const payload = event.split(/\r?\n/)
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.slice(5).trimStart())
+          .join('\n');
+        if (payload) onEvent(JSON.parse(payload));
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function resetPipelineSteps() {
+  ['generator', 'refiner'].forEach(stage => {
+    const step = document.getElementById(`step-${stage}`);
+    if (!step) return;
+    step.className = 'pipeline-step';
+    document.getElementById(`badge-${stage}`).textContent = '';
+  });
+}
+
+function updatePipelineStep(stage, status, preview, errorMsg, label) {
+  const step = document.getElementById(`step-${stage}`);
+  const badge = document.getElementById(`badge-${stage}`);
+  const nameEl = step?.querySelector('.step-name');
+  if (!step) return;
+  if (label && nameEl) nameEl.textContent = label;
+  step.className = `pipeline-step ${status}`;
+  if (status === 'running') badge.textContent = 'Processing...';
+  else if (status === 'done') badge.textContent = '✓ Complete';
+  else if (status === 'failed') badge.textContent = `✗ ${errorMsg || 'Failed'}`;
+  else if (status === 'skipped') {
+    badge.textContent = '⏭ Skipped';
+    badge.style.color = 'var(--orange)';
+    badge.style.background = 'rgba(245,158,11,0.1)';
+  }
+}
+
+function retryGeneration() {
+  if (lastPrompt) {
+    document.getElementById('promptInput').value = lastPrompt;
+    updatePromptCount();
+    generateWebsite();
+  }
+}
+
+// === PARSE CODE ===
+function parseGeneratedCode(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  let css = '';
+  doc.querySelectorAll('style').forEach(s => { css += s.textContent + '\n'; });
+
+  let js = '';
+  doc.querySelectorAll('script').forEach(s => {
+    if (!s.src) js += s.textContent + '\n';
+  });
+
+  const clone = doc.cloneNode(true);
+  clone.querySelectorAll('style, script').forEach(el => el.remove());
+  let bodyHTML = clone.querySelector('body')?.innerHTML || '';
+  let headContent = '';
+  clone.querySelectorAll('head > *').forEach(el => {
+    headContent += el.outerHTML + '\n';
+  });
+
+  const cleanHTML = `<!DOCTYPE html>\n<html lang="en">\n<head>\n${headContent}</head>\n<body>\n${bodyHTML.trim()}\n</body>\n</html>`;
+
+  generatedCode = {
+    html: cleanHTML.trim(),
+    css: css.trim(),
+    js: js.trim()
+  };
+}
+
+/** Apply a server-validated site object, with legacy HTML as a fallback. */
+function applyGeneratedSite(site, fallbackHtml) {
+  const emptyState = document.getElementById('previewEmptyState');
+  if(emptyState) emptyState.style.display = 'none';
+  
+  if (site && typeof site.html === 'string' && typeof site.css === 'string' && typeof site.js === 'string') {
+    generatedCode = { html: site.html, css: site.css, js: site.js };
+    fullGeneratedHTML = site.document || rebuildFullHTML();
+  } else {
+    fullGeneratedHTML = fallbackHtml || '';
+    parseGeneratedCode(fullGeneratedHTML);
+  }
+  renderPreview(fullGeneratedHTML);
+  switchCodeTab('html');
+}
+
+// === PREVIEW ===
+function renderPreview(html) {
+  const pane = document.getElementById('previewPane');
+  const old = pane.querySelector('iframe');
+  if (old) old.remove();
+  const iframe = document.createElement('iframe');
+  iframe.title = 'Generated website preview';
+  iframe.sandbox = 'allow-scripts';
+  iframe.referrerPolicy = 'no-referrer';
+  iframe.srcdoc = buildPreviewDocument(html);
+  pane.appendChild(iframe);
+}
+
+/** The iframe is isolated and this CSP prevents generated code from making network requests. */
+function buildPreviewDocument(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html || '', 'text/html');
+  doc.querySelectorAll('base, iframe, object, embed, meta[http-equiv], script[src]').forEach(el => el.remove());
+  doc.querySelectorAll('link').forEach(link => {
+    if (!/^https:\/\/fonts\.googleapis\.com\//i.test(link.href || '')) link.remove();
+  });
+  // Only strip dangerous attributes, NOT event handlers (onclick, etc.)
+  doc.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      if (attr.name === 'srcdoc' || /^javascript:/i.test(attr.value.trim())) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  const policy = document.createElement('meta');
+  policy.httpEquiv = 'Content-Security-Policy';
+  policy.content = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'";
+  doc.head.prepend(policy);
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+// === CODE DISPLAY ===
+function updateCodeDisplay() {
+  const code = generatedCode[currentCodeTab] || '';
+  document.getElementById('codeEditor').value = code;
+  document.getElementById('codeHighlighted').innerHTML = syntaxHighlight(code, currentCodeTab);
+}
+
+function switchCodeTab(tab, btn) {
+  currentCodeTab = tab;
+  document.querySelectorAll('.code-tab, .code-tab-new').forEach(t => t.classList.remove('active'));
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const target = Array.from(document.querySelectorAll('.code-tab, .code-tab-new')).find(b => b.textContent.trim().toLowerCase().includes(tab));
+    if (target) target.classList.add('active');
+  }
+  updateCodeDisplay();
+}
+
+// === SYNTAX HIGHLIGHTING ===
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function syntaxHighlight(code, lang) {
+  let escaped = escapeHtml(code);
+  if (lang === 'html') {
+    escaped = escaped.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="syn-comment">$1</span>');
+    escaped = escaped.replace(/(&lt;\/?)(\w[\w-]*)/g, '<span class="syn-punct">$1</span><span class="syn-tag">$2</span>');
+    escaped = escaped.replace(/([\w-]+)(=)(&quot;[^&]*&quot;)/g, '<span class="syn-attr">$1</span><span class="syn-punct">$2</span><span class="syn-str">$3</span>');
+    escaped = escaped.replace(/(\/?\&gt;)/g, '<span class="syn-punct">$1</span>');
+  } else if (lang === 'css') {
+    escaped = escaped.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+    escaped = escaped.replace(/^([^{}\n]+)(\{)/gm, '<span class="syn-sel">$1</span><span class="syn-brace">$2</span>');
+    escaped = escaped.replace(/([\w-]+)(\s*:\s*)/g, '<span class="syn-prop">$1</span>$2');
+    escaped = escaped.replace(/:\s*([^;{}\n]+)/g, ': <span class="syn-val">$1</span>');
+    escaped = escaped.replace(/([{}])/g, '<span class="syn-brace">$1</span>');
+  } else if (lang === 'js') {
+    escaped = escaped.replace(/(\/\/.*$)/gm, '<span class="syn-comment">$1</span>');
+    escaped = escaped.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="syn-comment">$1</span>');
+    escaped = escaped.replace(/(&quot;[^&]*?&quot;)/g, '<span class="syn-str">$1</span>');
+    escaped = escaped.replace(/('(?:[^'\\]|\\.)*')/g, '<span class="syn-str">$1</span>');
+    escaped = escaped.replace(/(`(?:[^`\\]|\\.)*`)/g, '<span class="syn-str">$1</span>');
+    const kws = ['const','let','var','function','return','if','else','for','while','class','new','this','import','export','async','await','try','catch','throw','switch','case','break','default','true','false','null','undefined','typeof','instanceof'];
+    kws.forEach(kw => {
+      escaped = escaped.replace(new RegExp(`\\b(${kw})\\b`, 'g'), '<span class="syn-kw">$1</span>');
+    });
+    escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="syn-num">$1</span>');
+    escaped = escaped.replace(/([\w$]+)(\s*\()/g, '<span class="syn-fn">$1</span>$2');
+  }
+  return escaped;
+}
+
+// === LIVE EDITING ===
+function toggleEdit() {
+  isEditing = !isEditing;
+  const wrap = document.getElementById('codeEditorWrap');
+  const btn = document.getElementById('editToggle');
+  if (isEditing) {
+    wrap.classList.add('editing');
+    btn.textContent = 'Done';
+    btn.classList.add('primary');
+    document.getElementById('codeEditor').focus();
+  } else {
+    wrap.classList.remove('editing');
+    btn.textContent = 'Edit';
+    btn.classList.remove('primary');
+    applyCodeEdits();
+  }
+}
+
+let liveEditTimer;
+document.getElementById('codeEditor').addEventListener('input', () => {
+  clearTimeout(liveEditTimer);
+  liveEditTimer = setTimeout(() => {
+    if (isEditing) applyCodeEdits();
+  }, 600);
+});
+
+function applyCodeEdits() {
+  const code = document.getElementById('codeEditor').value;
+  generatedCode[currentCodeTab] = code;
+  fullGeneratedHTML = rebuildFullHTML();
+  renderPreview(fullGeneratedHTML);
+  document.getElementById('codeHighlighted').innerHTML = syntaxHighlight(code, currentCodeTab);
+}
+
+function rebuildFullHTML() {
+  const htmlPart = generatedCode.html || '';
+  const cssPart = generatedCode.css || '';
+  const jsPart = generatedCode.js || '';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlPart, 'text/html');
+  doc.querySelectorAll('style, script').forEach(el => el.remove());
+  if (cssPart) {
+    const style = doc.createElement('style');
+    style.textContent = cssPart;
+    doc.head.appendChild(style);
+  }
+  if (jsPart) {
+    const script = doc.createElement('script');
+    script.textContent = jsPart;
+    doc.body.appendChild(script);
+  }
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+// === DEVICES ===
+function setDevice(device, btn) {
+  currentDevice = device;
+  document.querySelectorAll('#deviceTabs .tab-item').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('previewPane');
+  if (pane) pane.className = `preview-pane device-${device}`;
+}
+
+// === VIEWS ===
+function setView(mode, btn) {
+  if (btn) {
+    document.querySelectorAll('.tab-group .tab-item').forEach(t => {
+      if (t.closest('.tab-group') === btn.closest('.tab-group')) {
+        t.classList.remove('active');
+      }
+    });
+    btn.classList.add('active');
+  }
+  const panel = document.getElementById('codePanel');
+  const preview = document.getElementById('previewPane');
+  const resizer = document.getElementById('resizer');
+
+  panel.classList.remove('expanded', 'collapsed');
+  panel.style.height = '';
+  panel.style.flex = '';
+  preview.style.display = '';
+  resizer.style.display = '';
+
+  if (mode === 'preview') {
+    panel.classList.add('collapsed');
+    resizer.style.display = 'none';
+  } else if (mode === 'code') {
+    preview.style.display = 'none';
+    panel.classList.add('expanded');
+    resizer.style.display = 'none';
+  }
+}
+
+// === COPY ===
+function copyCurrentCode() {
+  const code = currentCodeTab === 'html' ? fullGeneratedHTML : generatedCode[currentCodeTab];
+  navigator.clipboard.writeText(code || '');
+  showToast('Copied!');
+}
+
+// === DOWNLOAD ===
+async function downloadZip() {
+  if (!fullGeneratedHTML) return;
+  const files = [{ name: 'index.html', content: buildDownloadIndex() }];
+  if (generatedCode.css) files.push({ name: 'style.css', content: generatedCode.css });
+  if (generatedCode.js) files.push({ name: 'script.js', content: generatedCode.js });
+  const zip = buildZip(files);
+  const blob = new Blob([zip], { type: 'application/zip' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'neurobuild-website.zip';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Downloaded 📦');
+}
+
+function buildDownloadIndex() {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(generatedCode.html || fullGeneratedHTML, 'text/html');
+  doc.querySelectorAll('style, script').forEach(el => el.remove());
+  if (generatedCode.css) {
+    const stylesheet = doc.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = 'style.css';
+    doc.head.appendChild(stylesheet);
+  }
+  if (generatedCode.js) {
+    const script = doc.createElement('script');
+    script.src = 'script.js';
+    script.defer = true;
+    doc.body.appendChild(script);
+  }
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+function buildZip(files) {
+  const encoder = new TextEncoder();
+  let offset = 0;
+  const localHeaders = [];
+  const centralHeaders = [];
+  for (const file of files) {
+    const encoded = encoder.encode(file.content);
+    const nameBytes = encoder.encode(file.name);
+    const local = new ArrayBuffer(30 + nameBytes.length + encoded.length);
+    const lv = new DataView(local);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true);
+    lv.setUint16(12, 0, true);
+    lv.setUint32(14, crc32(encoded), true);
+    lv.setUint32(18, encoded.length, true);
+    lv.setUint32(22, encoded.length, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    new Uint8Array(local, 30).set(nameBytes);
+    new Uint8Array(local, 30 + nameBytes.length).set(encoded);
+    localHeaders.push(new Uint8Array(local));
+    const central = new ArrayBuffer(46 + nameBytes.length);
+    const cv = new DataView(central);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0, true);
+    cv.setUint32(16, crc32(encoded), true);
+    cv.setUint32(20, encoded.length, true);
+    cv.setUint32(24, encoded.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true);
+    cv.setUint32(42, offset, true);
+    new Uint8Array(central, 46).set(nameBytes);
+    centralHeaders.push(new Uint8Array(central));
+    offset += local.byteLength;
+  }
+  const centralOffset = offset;
+  let centralSize = 0;
+  centralHeaders.forEach(h => centralSize += h.length);
+  const end = new ArrayBuffer(22);
+  const ev = new DataView(end);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, centralOffset, true);
+  ev.setUint16(20, 0, true);
+  const all = new Uint8Array(offset + centralSize + 22);
+  let pos = 0;
+  localHeaders.forEach(h => { all.set(h, pos); pos += h.length; });
+  centralHeaders.forEach(h => { all.set(h, pos); pos += h.length; });
+  all.set(new Uint8Array(end), pos);
+  return all;
+}
+
+function crc32(data) {
+  let crc = ~0;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return ~crc >>> 0;
+}
+
+// === ITERATIVE ===
+function submitIterative() {
+  const input = document.getElementById('iterativeInput');
+  const val = input.value.trim();
+  if (!val) return;
+  refineCode(val, true);
+}
+
+// === PROJECTS ===
+function projectNameFromPrompt(prompt) {
+  const clean = String(prompt || 'Untitled website')
+    .replace(/\s+/g, ' ')
+    .replace(/[.?!,:;]+$/g, '')
+    .trim();
+  return clean.slice(0, 56) || 'Untitled website';
+}
+
+function updatePromptCount() {
+  const input = document.getElementById('promptInput');
+  const count = document.getElementById('promptCount');
+  if (!input || !count) return;
+  count.textContent = `${input.value.length.toLocaleString()} / 2,000 characters`;
+  count.classList.toggle('limit', input.value.length >= 1_800);
+}
+
+async function requestProject(endpoint, options = {}) {
+  const { headers: customHeaders, ...requestOptions } = options;
+  const response = await fetch(`/api/projects${endpoint}`, {
+    ...requestOptions,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...(customHeaders || {})
+    }
+  });
+  if (response.status === 204) return null;
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Project request failed');
+  return data;
+}
+
+async function renderProjects() {
+  const grid = document.getElementById('projectsGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="project-card" style="opacity:0.4"><h4>Loading projects…</h4><p>Please wait</p></div>';
+
+  try {
+    const data = await requestProject('/');
+    const projects = data.projects || [];
+    if (projects.length === 0) {
+      grid.innerHTML = '<div class="project-card" style="opacity:0.4"><h4>No projects yet</h4><p>Generate to start</p></div>';
+      return;
+    }
+    grid.innerHTML = projects.map(p => `
+      <div class="project-card${p.id === currentProjectId ? ' active' : ''}" onclick="loadProject('${p.id}')">
+        <h4>${escapeHtmlText(p.name)}</h4>
+        <p>${new Date(p.updatedAt).toLocaleDateString()}</p>
+      </div>
+    `).join('');
+  } catch (error) {
+    grid.innerHTML = '<div class="project-card" style="opacity:0.55"><h4>Projects unavailable</h4><p>Check your database connection</p></div>';
+    console.error('Could not load projects:', error);
+  }
+}
+
+function createNewProject() {
+  currentProjectId = null;
+  fullGeneratedHTML = '';
+  generatedCode = { html: '', css: '', js: '' };
+  lastPrompt = '';
+  document.getElementById('promptInput').value = '';
+  updatePromptCount();
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('previewPane').querySelector('iframe')?.remove();
+  document.getElementById('codeEditor').value = '';
+  document.getElementById('codeHighlighted').textContent = '';
+  document.getElementById('promptInput').focus();
+  renderProjects();
+  showToast('New project ready');
+}
+
+async function saveCurrentProject({ quiet = false } = {}) {
+  if (!fullGeneratedHTML) {
+    if (!quiet) showToast('Generate a website before saving');
+    return false;
+  }
+
+  const button = document.getElementById('saveProjectBtn');
+  const originalMarkup = button?.innerHTML;
+  if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+
+  try {
+    const payload = { prompt: lastPrompt, html: fullGeneratedHTML };
+    let data;
+    if (currentProjectId) {
+      data = await requestProject(`/${currentProjectId}`, {
+        method: 'PATCH', body: JSON.stringify(payload)
+      });
+    } else {
+      data = await requestProject('/', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, name: projectNameFromPrompt(lastPrompt) })
+      });
+      currentProjectId = data.project.id;
+    }
+    await renderProjects();
+    if (!quiet) showToast('Project saved');
+    return true;
+  } catch (error) {
+    if (!quiet) showToast(`Could not save: ${error.message}`);
+    console.error('Could not save project:', error);
+    return false;
+  } finally {
+    if (button) { button.disabled = false; button.innerHTML = originalMarkup || 'Save'; }
+  }
+}
+
+async function loadProject(id) {
+  try {
+    const data = await requestProject(`/${id}`);
+    const project = data.project;
+    currentProjectId = project.id;
+    fullGeneratedHTML = project.html;
+    lastPrompt = project.prompt || '';
+    document.getElementById('promptInput').value = lastPrompt;
+    updatePromptCount();
+    parseGeneratedCode(fullGeneratedHTML);
+    renderPreview(fullGeneratedHTML);
+    updateCodeDisplay();
+    enterWorkspace();
+    await renderProjects();
+    showToast(`Loaded ${project.name}`);
+  } catch (error) {
+    showToast(`Could not load: ${error.message}`);
+  }
+}
+
+// === HISTORY ===
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem('nb_history') || '[]'); }
+  catch { return []; }
+}
+
+function saveToHistory(prompt, html) {
+  const history = getHistory();
+  history.unshift({
+    id: Date.now(),
+    prompt: prompt,
+    html: html,
+    timestamp: new Date().toISOString(),
+    model: document.getElementById('modelSelect').value
+  });
+  if (history.length > 50) history.pop();
+  localStorage.setItem('nb_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function deleteFromHistory(id) {
+  let history = getHistory().filter(h => h.id !== id);
+  localStorage.setItem('nb_history', JSON.stringify(history));
+  renderHistory();
+  showToast('Removed');
+}
+
+function loadFromHistory(id) {
+  const item = getHistory().find(h => h.id === id);
+  if (!item) return;
+  fullGeneratedHTML = item.html;
+  lastPrompt = item.prompt;
+  document.getElementById('promptInput').value = item.prompt;
+  updatePromptCount();
+  parseGeneratedCode(fullGeneratedHTML);
+  enterWorkspace();
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('errorOverlay').classList.remove('visible');
+  renderPreview(fullGeneratedHTML);
+  updateCodeDisplay();
+  toggleHistory();
+  showToast('Loaded');
+}
+
+function renderHistory() {
+  const history = getHistory();
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+  if (history.length === 0) {
+    if (empty) empty.style.display = 'flex';
+    list.innerHTML = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = history.map(h => {
+    const d = new Date(h.timestamp);
+    const t = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+              ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="history-item" onclick="loadFromHistory(${h.id})">
+        <div class="history-item-prompt">${escapeHtmlText(h.prompt)}</div>
+        <div class="history-item-meta">
+          <span>${t}</span>
+          <span>${h.model || 'gemma'}</span>
+        </div>
+        <div class="history-item-actions">
+          <button class="history-action" onclick="event.stopPropagation();loadFromHistory(${h.id})">Load</button>
+          <button class="history-action del" onclick="event.stopPropagation();deleteFromHistory(${h.id})">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function escapeHtmlText(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function toggleHistory() {
+  const panel = document.getElementById('historyPanel');
+  const backdrop = document.getElementById('overlayBackdrop');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open');
+  backdrop.classList.toggle('visible');
+  if (!isOpen) renderHistory();
+}
+
+// === NAVIGATION ===
+function enterWorkspace() {
+  
+  
+  
+}
+
+function backToHero() {
+  document.getElementById('heroSection').style.display = '';
+  document.getElementById('workspace').classList.remove('visible');
+  
+  document.getElementById('promptInput').value = '';
+  updatePromptCount();
+  document.getElementById('promptInput').focus();
+  renderProjects();
+}
+
+// === TOAST ===
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+// === REFINE CODE ===
+async function refineCode(instruction, isIterativeBar = false) {
+  if (!fullGeneratedHTML) {
+    showToast('No code to refine');
+    return;
+  }
+  const fixBtn = document.getElementById('fixBtn');
+  const optBtn = document.getElementById('optimizeBtn');
+  const iterBtn = document.getElementById('iterativeBtn');
+  const iterInput = document.getElementById('iterativeInput');
+
+  fixBtn.disabled = true;
+  optBtn.disabled = true;
+  if (iterBtn) iterBtn.disabled = true;
+  if (iterInput) iterInput.disabled = true;
+
+  const origFix = fixBtn.textContent;
+  const origOpt = optBtn.textContent;
+  fixBtn.textContent = '...';
+  optBtn.textContent = '...';
+  if (isIterativeBar && iterBtn) iterBtn.textContent = 'Refining...';
+
+  try {
+    const res = await fetch('/api/refine-code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ code: fullGeneratedHTML, instruction })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Refinement failed');
+    }
+    const data = await res.json();
+    applyGeneratedSite(data.site, data.html);
+    await saveCurrentProject({ quiet: true });
+    showToast('Refined ✨');
+    if (isIterativeBar && iterInput) iterInput.value = '';
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  } finally {
+    fixBtn.disabled = false;
+    optBtn.disabled = false;
+    fixBtn.textContent = origFix;
+    optBtn.textContent = origOpt;
+    if (iterBtn) { iterBtn.disabled = false; iterBtn.textContent = 'Prompt'; }
+    if (iterInput) iterInput.disabled = false;
+  }
+}
+
+// === RESIZER ===
+function initResizer() {
+  const resizer = document.getElementById('resizer');
+  const codePanel = document.getElementById('codePanel');
+  let isDragging = false;
+  let startY, startHeight;
+
+  resizer.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startY = e.clientY;
+    startHeight = codePanel.offsetHeight;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    resizer.classList.add('dragging');
+    document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = 'none');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  });
+
+  function onMove(e) {
+    if (!isDragging) return;
+    const dy = startY - e.clientY;
+    const newHeight = Math.max(60, Math.min(window.innerHeight - 180, startHeight + dy));
+    codePanel.style.height = `${newHeight}px`;
+    codePanel.style.flex = 'none';
+  }
+
+  function onUp() {
+    isDragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    resizer.classList.remove('dragging');
+    document.querySelectorAll('iframe').forEach(f => f.style.pointerEvents = 'auto');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+}
+
+// === INIT ===
+const savedPrompt = localStorage.getItem('templatePrompt');
+if (savedPrompt) {
+  document.getElementById('promptInput').value = savedPrompt;
+  localStorage.removeItem('templatePrompt');
+}
+updatePromptCount();
+
+renderHistory();
+renderProjects();
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  initResizer();
+});
+
+// === THEME ===
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('nb_theme', isLight ? 'light' : 'dark');
+  updateThemeIcon(isLight);
+}
+
+function updateThemeIcon(isLight) {
+  const icon = document.getElementById('themeIcon');
+  if (isLight) {
+    icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+  } else {
+    icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+  }
+}
+
+if (localStorage.getItem('nb_theme') === 'light') {
+  document.body.classList.add('light-mode');
+  updateThemeIcon(true);
+}
+
+// ═══════════════════════════════════════════
+// CHAT PANEL
+// ═══════════════════════════════════════════
+let chatConversationId = null;
+let chatStreaming = false;
+let chatAbort = null;
+
+function toggleChat() {
+  const panel = document.getElementById('chatPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('chatInput').focus();
+  }
+}
+
+function newConversation() {
+  chatConversationId = null;
+  const msgs = document.getElementById('chatMessages');
+  msgs.innerHTML = `<div class="chat-empty"><div class="icon">💬</div><p>Ask AI to build, modify, or explain your website. AI responses with HTML can be applied directly.</p></div>`;
+  document.getElementById('chatInput').value = '';
+}
+
+function addChatMessage(role, content, html) {
+  const msgs = document.getElementById('chatMessages');
+  // Remove empty state
+  const empty = msgs.querySelector('.chat-empty');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+
+  if (role === 'assistant') {
+    // Render text with basic formatting
+    let rendered = escapeHtml(content)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>')
+      .replace(/\n/g, '<br>');
+
+    div.innerHTML = rendered;
+
+    if (html) {
+      const btn = document.createElement('button');
+      btn.className = 'apply-html-btn';
+      btn.textContent = '✦ Apply to Preview';
+      btn.onclick = () => applyChatHtml(html);
+      div.appendChild(btn);
+    }
+  } else {
+    div.textContent = content;
+  }
+
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function applyChatHtml(html) {
+  if (!html) return;
+  currentHtml = html;
+  updateEditor();
+  showToast('Applied HTML from chat');
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message || chatStreaming) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  addChatMessage('user', message);
+
+  chatStreaming = true;
+  document.getElementById('chatSendBtn').disabled = true;
+
+  // Add typing indicator
+  const msgs = document.getElementById('chatMessages');
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'chat-typing';
+  typingDiv.textContent = 'AI is thinking...';
+  msgs.appendChild(typingDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Create a placeholder for streaming
+  let accumulatedText = '';
+  let streamDiv = null;
+
+  try {
+    chatAbort = window.NeuroAPI.ChatAPI.streamChat(
+      message,
+      chatConversationId,
+      null,
+      // onChunk
+      (chunk) => {
+        if (typingDiv.parentNode) typingDiv.remove();
+        if (!streamDiv) {
+          streamDiv = document.createElement('div');
+          streamDiv.className = 'chat-msg assistant';
+          msgs.appendChild(streamDiv);
+        }
+        accumulatedText += chunk;
+        streamDiv.textContent = accumulatedText;
+        msgs.scrollTop = msgs.scrollHeight;
+      },
+      // onDone
+      (reply, html) => {
+        if (typingDiv.parentNode) typingDiv.remove();
+        if (streamDiv) streamDiv.remove();
+        addChatMessage('assistant', reply, html);
+        chatStreaming = false;
+        document.getElementById('chatSendBtn').disabled = false;
+        document.getElementById('chatToggleBtn').classList.add('has-messages');
+      },
+      // onError
+      (error) => {
+        if (typingDiv.parentNode) typingDiv.remove();
+        if (streamDiv) streamDiv.remove();
+        addChatMessage('assistant', `Error: ${error.message}`);
+        chatStreaming = false;
+        document.getElementById('chatSendBtn').disabled = false;
+      },
+      // onInit
+      (conversationId) => {
+        chatConversationId = conversationId;
+      }
+    );
+  } catch (err) {
+    if (typingDiv.parentNode) typingDiv.remove();
+    addChatMessage('assistant', `Error: ${err.message}`);
+    chatStreaming = false;
+    document.getElementById('chatSendBtn').disabled = false;
+  }
+}
+
+// Auto-resize chat input
+document.getElementById('chatInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ═══════════════════════════════════════════
+// AI TOOLS
+// ═══════════════════════════════════════════
+function toggleAITools() {
+  const menu = document.getElementById('aiToolsMenu');
+  menu.classList.toggle('open');
+}
+
+// Close AI tools menu on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.ai-tools-wrap')) {
+    document.getElementById('aiToolsMenu')?.classList.remove('open');
+  }
+});
+
+async function runAITool(tool) {
+  document.getElementById('aiToolsMenu').classList.remove('open');
+
+  if (!currentHtml && tool !== 'design-system') {
+    showToast('Generate a website first', 'error');
+    return;
+  }
+
+  try {
+    if (tool === 'suggest') {
+      showToast('Analyzing your design...');
+      const data = await window.NeuroAPI.AIEnhanceAPI.suggest(currentHtml);
+      // Open chat and show suggestions
+      document.getElementById('chatPanel').classList.add('open');
+      const suggestions = data.suggestions;
+      let text;
+      if (typeof suggestions === 'string') {
+        text = suggestions;
+      } else if (suggestions.improvements) {
+        text = `**AI Suggestions (Score: ${suggestions.score || '?'}/100)**\n\n`;
+        if (Array.isArray(suggestions.improvements)) {
+          suggestions.improvements.forEach((s, i) => { text += `${i+1}. ${s}\n`; });
+        }
+      } else {
+        text = JSON.stringify(suggestions, null, 2);
+      }
+      addChatMessage('assistant', text);
+    } else if (tool === 'design-system') {
+      const prompt = window.prompt('Describe your brand or design style:');
+      if (!prompt) return;
+      showToast('Generating design system...');
+      const data = await window.NeuroAPI.AIEnhanceAPI.generateDesignSystem(prompt);
+      document.getElementById('chatPanel').classList.add('open');
+      const ds = data.designSystem;
+      let text;
+      if (typeof ds === 'string') {
+        text = ds;
+      } else {
+        text = '**Generated Design System**\n\n' + JSON.stringify(ds, null, 2);
+      }
+      addChatMessage('assistant', text);
+    } else if (tool === 'content') {
+      const prompt = window.prompt('What content do you need? (e.g., "Write hero section copy for a SaaS product")');
+      if (!prompt) return;
+      showToast('Generating content...');
+      const data = await window.NeuroAPI.AIEnhanceAPI.generateContent(prompt, 'general');
+      document.getElementById('chatPanel').classList.add('open');
+      addChatMessage('assistant', typeof data.content === 'string' ? data.content : JSON.stringify(data.content, null, 2));
+    }
+  } catch (err) {
+    showToast('AI tool failed: ' + err.message, 'error');
+  }
+}
+
+// Handle component insertion from components page
+(function checkComponentInsert() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('insertComponent') === '1') {
+    const stored = sessionStorage.getItem('insertComponent');
+    if (stored) {
+      try {
+        const { name, html } = JSON.parse(stored);
+        if (html) {
+          if (currentHtml) {
+            // Append before </body>
+            currentHtml = currentHtml.replace('</body>', html + '\n</body>');
+          } else {
+            currentHtml = html;
+          }
+          updateEditor();
+          showToast(`Inserted: ${name}`);
+        }
+      } catch {}
+      sessionStorage.removeItem('insertComponent');
+    }
+    window.history.replaceState({}, '', '/dashboard.html');
+  }
+})();
+
+// === CALCULATOR ===
+let calcCurrent = '0', calcPrev = '', calcOp = '', calcNewNum = true;
+function initCalc() {
+  const btns = [
+    {t:'C',c:'clear'},{t:'±',c:''},{t:'%',c:'op'},{t:'÷',c:'op'},
+    {t:'7',c:''},{t:'8',c:''},{t:'9',c:''},{t:'×',c:'op'},
+    {t:'4',c:''},{t:'5',c:''},{t:'6',c:''},{t:'−',c:'op'},
+    {t:'1',c:''},{t:'2',c:''},{t:'3',c:''},{t:'+',c:'op'},
+    {t:'0',c:'wide'},{t:'.',c:''},{t:'=',c:'eq'}
+  ];
+  const grid = document.getElementById('calcButtons');
+  grid.innerHTML = '';
+  btns.forEach(b => {
+    const el = document.createElement('button');
+    el.className = 'calc-btn ' + b.c;
+    el.textContent = b.t;
+    el.onclick = () => calcHandle(b.t);
+    grid.appendChild(el);
+  });
+}
+function calcHandle(t) {
+  const expr = document.getElementById('calcExpr');
+  const res = document.getElementById('calcResult');
+  if (t === 'C') { calcCurrent='0'; calcPrev=''; calcOp=''; calcNewNum=true; expr.textContent=''; res.textContent='0'; return; }
+  if (t === '±') { if(calcCurrent!=='0') calcCurrent=calcCurrent.startsWith('-')?calcCurrent.slice(1):'-'+calcCurrent; res.textContent=calcCurrent; return; }
+  if (t === '%') { calcCurrent=String(parseFloat(calcCurrent)/100); res.textContent=calcCurrent; return; }
+  if ('0123456789.'.includes(t)) {
+    if(calcNewNum){calcCurrent=t==='.'?'0.':t;calcNewNum=false;}
+    else{if(t==='.'&&calcCurrent.includes('.'))return;calcCurrent+=t;}
+    res.textContent=calcCurrent;return;
+  }
+  if (['+','−','×','÷'].includes(t)) {
+    if(calcPrev&&calcOp&&!calcNewNum)calcDo();
+    calcPrev=calcCurrent;calcOp=t;calcNewNum=true;
+    expr.textContent=calcPrev+' '+t;return;
+  }
+  if (t === '=') { if(!calcPrev||!calcOp)return;calcDo();expr.textContent='';calcOp='';calcPrev=''; }
+}
+function calcDo() {
+  const a=parseFloat(calcPrev),b=parseFloat(calcCurrent);let r;
+  if(calcOp==='+')r=a+b;else if(calcOp==='−')r=a-b;else if(calcOp==='×')r=a*b;else if(calcOp==='÷')r=b===0?'Error':a/b;
+  const eq=calcPrev+' '+calcOp+' '+calcCurrent+' = '+(typeof r==='number'?parseFloat(r.toFixed(10)):r);
+  calcAddHistory(eq);
+  calcCurrent=String(typeof r==='number'?parseFloat(r.toFixed(10)):r);
+  document.getElementById('calcResult').textContent=calcCurrent;calcNewNum=true;
+}
+function calcAddHistory(t){const d=document.createElement('div');d.textContent=t;const h=document.getElementById('calcHistory');h.prepend(d);if(h.children.length>20)h.removeChild(h.lastChild);}
+function openCalc(){document.getElementById('calcOverlay').classList.add('open');initCalc();}
+function closeCalc(){document.getElementById('calcOverlay').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(!document.getElementById('calcOverlay').classList.contains('open'))return;if('0123456789'.includes(e.key))calcHandle(e.key);else if(e.key==='.')calcHandle('.');else if(e.key==='+')calcHandle('+');else if(e.key==='-')calcHandle('−');else if(e.key==='*')calcHandle('×');else if(e.key==='/'){e.preventDefault();calcHandle('÷');}else if(e.key==='Enter'||e.key==='=')calcHandle('=');else if(e.key==='Escape')closeCalc();else if(e.key==='%')calcHandle('%');else if(e.key==='Backspace'){if(!calcNewNum&&calcCurrent.length>1)calcCurrent=calcCurrent.slice(0,-1);else{calcCurrent='0';calcNewNum=true;}document.getElementById('calcResult').textContent=calcCurrent;}});
+
+// === PROMPT PANEL ===
+let promptFiles = [];
+let promptPanelOpen = true;
+
+function togglePromptPanel() {
+  const panel = document.getElementById('promptPanel');
+  promptPanelOpen = !promptPanelOpen;
+  panel.classList.toggle('visible', promptPanelOpen);
+}
+
+function updatePromptCount() {
+  const input = document.getElementById('promptInput');
+  const count = input.value.length;
+  const el = document.getElementById('promptCount');
+  if (el) el.textContent = `${count} / 2,000 characters`;
+}
+
+// File handling for prompt panel
+function handlePromptFileSelect(event) {
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        promptFiles.push({ name: file.name, type: file.type, data: e.target.result, file });
+        renderPromptFiles();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        promptFiles.push({ name: file.name, type: file.type, content: e.target.result, file });
+        renderPromptFiles();
+      };
+      reader.readAsText(file);
+    }
+  });
+  event.target.value = '';
+}
+
+function renderPromptFiles() {
+  const preview = document.getElementById('promptFilePreview');
+  preview.innerHTML = promptFiles.map((f, i) => {
+    if (f.type.startsWith('image/')) {
+      return `<div class="prompt-file-item">
+        <img src="${f.data}" alt="${f.name}">
+        <span>${f.name.substring(0, 15)}...</span>
+        <button class="remove-file" onclick="removePromptFile(${i})">✕</button>
+      </div>`;
+    }
+    return `<div class="prompt-file-item">
+      <span>📄</span>
+      <span>${f.name.substring(0, 20)}</span>
+      <button class="remove-file" onclick="removePromptFile(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removePromptFile(index) {
+  promptFiles.splice(index, 1);
+  renderPromptFiles();
+}
+
+// Drag and drop for prompt panel
+function setupPromptDragDrop() {
+  const area = document.getElementById('promptUploadArea');
+  if (!area) return;
+  ['dragenter', 'dragover'].forEach(e => {
+    area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.add('dragover'); });
+  });
+  ['dragleave', 'drop'].forEach(e => {
+    area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.remove('dragover'); });
+  });
+  area.addEventListener('drop', (e) => {
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          promptFiles.push({ name: file.name, type: file.type, data: ev.target.result, file });
+          renderPromptFiles();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          promptFiles.push({ name: file.name, type: file.type, content: ev.target.result, file });
+          renderPromptFiles();
+        };
+        reader.readAsText(file);
+      }
+    });
+  });
+}
+
+// Generate from prompt panel (handles both file upload and regular generation)
+async function generateFromPromptPanel() {
+  const prompt = document.getElementById('promptInput').value.trim();
+  if (!prompt && promptFiles.length === 0) {
+    showToast('Enter a prompt or upload a file', 'error');
+    return;
+  }
+
+  // Build file data for backend
+  const filesData = promptFiles.map(f => ({
+    name: f.name,
+    type: f.type,
+    content: f.content || null,
+    data: f.data || null
+  }));
+
+  // If files are attached, use the analyze-and-generate endpoint
+  if (promptFiles.length > 0) {
+    try {
+      showToast('Analyzing files and generating...');
+      const csrfRes = await fetch('/api/auth/csrf-token', { credentials: 'include' });
+      const { csrfToken } = await csrfRes.json();
+
+      const res = await fetch('/api/analyze-and-generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-CSRF-Token': csrfToken
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          prompt: prompt,
+          files: filesData,
+          model: document.getElementById('modelSelect')?.value
+        })
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      if (data.html) {
+        currentHtml = data.html;
+        updateEditor();
+        
+        
+        showToast('Website generated from files!');
+      }
+    } catch (err) {
+      showToast('Generation failed: ' + err.message, 'error');
+    }
+    return;
+  }
+
+  // Otherwise, use the regular generate endpoint
+  // Switch to workspace
+  
+  
+  
+  await generateWebsite();
+}
+
+// Load models into model select
+async function loadPromptModels() {
+  try {
+    const res = await fetch('/api/models', { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    const select = document.getElementById('modelSelect');
+    if (select && data.models) {
+      select.innerHTML = data.models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    }
+  } catch (e) {
+    console.log('Could not load models for prompt panel');
+  }
+}
+
+// Initialize prompt panel
+document.addEventListener('DOMContentLoaded', () => {
+  setupPromptDragDrop();
+  loadPromptModels();
+  // Show prompt panel by default
+  const panel = document.getElementById('promptPanel');
+  if (panel) panel.classList.add('visible');
+});
+</script>
+
+</body>
+</html>

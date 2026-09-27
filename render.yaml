@@ -1,0 +1,49 @@
+# Render Blueprint — NeuroBuild
+# Import this file in Render: New + → Blueprint → Public Repository → paste your GitHub repo.
+# Render builds the Docker image and provisions an auto-deploying web service.
+#
+# Requirements:
+#   - A MongoDB Atlas cluster (see DEPLOYMENT.md) with a connection string.
+#   - A cloud AI provider key (OpenRouter / NVIDIA NIM). Ollama is local-only.
+
+services:
+  - type: web
+    name: neurobuild
+    runtime: docker
+    repo: https://github.com/YOUR_USERNAME/pblpro
+    plan: free
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    autoDeploy: true
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # Randomly generated at first deploy, persisted afterwards
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+        # Set this manually after importing — your Atlas connection string
+        comment: "mongodb+srv://<user>:<password>@<cluster>.mongodb.net/neurobuild?retryWrites=true&w=majority"
+      - key: CLOUD_API_KEY
+        sync: false
+        comment: "OpenRouter / NVIDIA NIM API key for production AI generation"
+      - key: CLOUD_API_URL
+        sync: false
+        value: https://openrouter.ai/api/v1/chat/completions
+      - key: OLLAMA_URL
+        sync: false
+        comment: "Leave empty on Render — Ollama requires a custom/bare-metal host"
+      - key: OLLAMA_MODEL
+        sync: false
+        value: qwen3:4b
+      - key: PIPELINE_ENABLED
+        value: "true"
+      - key: PIPELINE_MODEL_GENERATOR
+        value: qwen3:4b
+      - key: PIPELINE_MODEL_REFINER
+        value: qwen3:4b

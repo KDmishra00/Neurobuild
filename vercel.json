@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "buildCommand": "cd client && npm ci && npm run build && cd ..",
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "client/dist/**",
+          "middleware/**",
+          "models/**",
+          "routes/**",
+          "services/**",
+          "frontend/**",
+          "public/**"
+        ]
+      }
+    },
+    {
+      "src": "client/dist/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "server.js" },
+    { "handle": "filesystem" },
+    { "src": "/assets/(.*)", "dest": "/client/dist/assets/$1" },
+    { "src": "/favicon.svg", "dest": "/client/dist/favicon.svg" },
+    { "src": "/icons.svg", "dest": "/client/dist/icons.svg" },
+    { "src": "/(.*)", "dest": "/client/dist/index.html" }
+  ]
+}

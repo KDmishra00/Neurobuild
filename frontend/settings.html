@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Neurobuild</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/common.css">
+<script>
+  // Theme manager — shared across all pages
+  (function() {
+    const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+    const isDark = settings.darkMode !== false; // default to dark
+    if (!isDark) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+
+  function toggleTheme() {
+    const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+    const isCurrentlyDark = settings.darkMode !== false;
+    settings.darkMode = !isCurrentlyDark;
+    localStorage.setItem('settings', JSON.stringify(settings));
+    if (settings.darkMode) {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  }
+</script>
+<style>
+  .settings-select {
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13.5px;
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .settings-select:focus {
+    border-color: var(--accent);
+  }
+
+  .save-bar { display: flex; justify-content: flex-end; margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="dashboard.html" class="logo">
+      <div class="logo-icon">N</div>
+      Neuro<span>build</span>
+    </a>
+    <nav class="nav-links">
+      <a href="dashboard.html" class="nav-link">Builder</a>
+      <a href="templates.html" class="nav-link">Templates</a>
+      <a href="settings.html" class="nav-link active">Settings</a>
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <a href="dashboard.html" class="back-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
+  </div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Settings</h1>
+  <p class="page-subtitle">Customize your AI model providers, interface themes, and preferences</p>
+
+  <div class="section">
+    <div class="section-title">Appearance</div>
+    <div class="section-card">
+      <div class="field-row">
+        <div>
+          <div class="field-label">Dark mode</div>
+          <div class="field-desc">Always use glassmorphic dark theme</div>
+        </div>
+        <button class="toggle on" id="darkToggle" onclick="handleDarkToggle(this)"></button>
+      </div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Compact preview</div>
+          <div class="field-desc">Reduce preview frame height</div>
+        </div>
+        <button class="toggle" id="compactToggle" onclick="toggleSetting(this)"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Generation & AI Models</div>
+    <div class="section-card">
+      <div class="field-row">
+        <div>
+          <div class="field-label">AI Model</div>
+          <div class="field-desc">Default model used for website generation</div>
+        </div>
+        <select id="modelSelect" class="settings-select">
+          <option value="qwen3:14b">Qwen 3 (14B)</option>
+          <option value="qwen2.5-coder:7b">Qwen 2.5 Coder (7B)</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Auto-preview</div>
+          <div class="field-desc">Render preview automatically after generation completes</div>
+        </div>
+        <button class="toggle on" id="autoPreviewToggle" onclick="toggleSetting(this)"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Notifications</div>
+    <div class="section-card">
+      <div class="field-row">
+        <div>
+          <div class="field-label">Email updates</div>
+          <div class="field-desc">Receive product news, feature updates, and tips</div>
+        </div>
+        <button class="toggle" id="emailToggle" onclick="toggleSetting(this)"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Data Management</div>
+    <div class="section-card">
+      <div class="field-row">
+        <div>
+          <div class="field-label">Clear all projects</div>
+          <div class="field-desc">Remove all saved website builds from your account</div>
+        </div>
+        <button class="btn btn-danger" style="padding: 6px 14px; font-size: 12.5px;" onclick="clearProjects()">Clear Projects</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+  </div>
+</div>
+
+<script>
+  // Check authentication
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = 'login.html';
+  }
+
+  // Load settings
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const settings = user.settings || JSON.parse(localStorage.getItem('settings') || '{}');
+
+  // Sync UI with settings
+  if (settings.model) document.getElementById('modelSelect').value = settings.model;
+  if (settings.darkMode === false) document.getElementById('darkToggle').classList.remove('on');
+  if (settings.compact) document.getElementById('compactToggle').classList.add('on');
+  if (settings.autoPreview !== false) document.getElementById('autoPreviewToggle').classList.add('on');
+  if (settings.emailUpdates) document.getElementById('emailToggle').classList.add('on');
+
+  const fallbackModels = [
+    { id: 'qwen3:4b', name: 'Qwen 3 (4B)', type: 'local' }
+  ];
+
+  function renderModels(models) {
+    const select = document.getElementById('modelSelect');
+    select.innerHTML = models.map(m =>
+      `<option value="${m.id}">${m.name} (${m.type})</option>`
+    ).join('');
+    if (settings.model && models.some(m => m.id === settings.model)) {
+      select.value = settings.model;
+    } else if (models.length) {
+      select.value = models[0].id;
+    }
+  }
+
+  // Fetch available models
+  fetch('/api/models', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  .then(async res => {
+    if (!res.ok) throw new Error(`Model API failed: ${res.status}`);
+    return res.json();
+  })
+  .then(data => {
+    if (data.models?.length) {
+      renderModels(data.models);
+    } else {
+      renderModels(fallbackModels);
+    }
+  })
+  .catch(() => {
+    renderModels(fallbackModels);
+  });
+
+  function toggleSetting(el) {
+    el.classList.toggle('on');
+  }
+
+  function handleDarkToggle(el) {
+    el.classList.toggle('on');
+    toggleTheme();
+  }
+
+  async function saveSettings() {
+    const newSettings = {
+      darkMode: document.getElementById('darkToggle').classList.contains('on'),
+      compact: document.getElementById('compactToggle').classList.contains('on'),
+      autoPreview: document.getElementById('autoPreviewToggle').classList.contains('on'),
+      emailUpdates: document.getElementById('emailToggle').classList.contains('on'),
+      model: document.getElementById('modelSelect').value,
+    };
+
+    try {
+      // Save to server
+      await fetch('/api/auth/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newSettings)
+      });
+
+      // Update local
+      localStorage.setItem('settings', JSON.stringify(newSettings));
+      if (user) {
+        user.settings = newSettings;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+
+      const btn = document.querySelector('.save-bar .btn-primary');
+      btn.textContent = 'Saved!';
+      setTimeout(() => { btn.textContent = 'Save settings'; }, 1500);
+    } catch (err) {
+      alert('Failed to save settings');
+    }
+  }
+
+  async function clearProjects() {
+    if (!confirm('Are you sure? This will permanently remove all saved projects.')) return;
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to clear projects');
+      }
+      localStorage.removeItem('nb_projects');
+      alert('All projects cleared.');
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+</script>
+
+</body>
+</html>

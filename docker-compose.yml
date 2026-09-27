@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      MONGODB_URI: mongodb://mongo:27017/neurobuild
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      PIPELINE_ENABLED: ${PIPELINE_ENABLED:-true}
+      PIPELINE_MODEL_GENERATOR: ${PIPELINE_MODEL_GENERATOR:-qwen3:4b}
+      PIPELINE_MODEL_REFINER: ${PIPELINE_MODEL_REFINER:-qwen3:4b}
+      CLOUD_API_KEY: ${CLOUD_API_KEY:-}
+      CLOUD_API_URL: ${CLOUD_API_URL:-https://openrouter.ai/api/v1/chat/completions}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok", "localhost:27017/test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mongo_data:
