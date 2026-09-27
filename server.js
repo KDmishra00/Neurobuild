@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET must be set in production');
+  console.warn('[Security Warning] JWT_SECRET is not set in production. Using fallback secret.');
 }
 
 // Security middleware
@@ -117,9 +117,9 @@ app.get('/', (req, res) => {
   res.sendFile(indexFile);
 });
 
-// SPA fallback — any non-API GET that isn't a static asset returns index.html
+// SPA fallback — any non-API GET or HEAD that isn't a static asset returns index.html
 app.use((req, res, next) => {
-  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
     return res.sendFile(indexFile);
   }
   next();

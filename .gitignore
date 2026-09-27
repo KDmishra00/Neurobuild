@@ -14,8 +14,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Build artifacts
-client/dist/
 
 # IDE & Local Tooling
 .vscode/

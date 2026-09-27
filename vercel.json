@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd client && npm ci && npm run build && cd ..",
+  "buildCommand": "npm --prefix client install && npm --prefix client run build",
   "builds": [
     {
       "src": "server.js",
@@ -16,18 +16,12 @@
           "public/**"
         ]
       }
-    },
-    {
-      "src": "client/dist/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "server.js" },
-    { "handle": "filesystem" },
-    { "src": "/assets/(.*)", "dest": "/client/dist/assets/$1" },
-    { "src": "/favicon.svg", "dest": "/client/dist/favicon.svg" },
-    { "src": "/icons.svg", "dest": "/client/dist/icons.svg" },
-    { "src": "/(.*)", "dest": "/client/dist/index.html" }
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
   ]
 }

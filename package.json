@@ -4,6 +4,7 @@
   "description": "Neurobuild — Autonomous AI website generation platform with multi-turn chat, live preview, and analytics",
   "main": "server.js",
   "scripts": {
+    "build": "npm --prefix client install && npm --prefix client run build",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "check": "node scripts/check.js",
