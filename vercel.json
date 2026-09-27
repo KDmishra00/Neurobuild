@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install --omit=dev && npm --prefix client install",
+  "buildCommand": "npm --prefix client install && cd client && npx vite build",
+  "installCommand": "npm install",
   "outputDirectory": "client/dist",
   "functions": {
     "api/index.js": {
