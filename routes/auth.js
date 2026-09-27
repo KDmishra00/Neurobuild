@@ -10,6 +10,14 @@ const Project = require('../models/Project');
 const Conversation = require('../models/Conversation');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { issueCsrfToken } = require('../middleware/csrf');
+
+// CSRF token endpoint — double-submit pattern for unauthenticated requests.
+// Does NOT require database connection.
+router.get('/csrf-token', (req, res) => {
+  const csrfToken = issueCsrfToken();
+  res.json({ csrfToken });
+});
 
 router.use(requireDb);
 

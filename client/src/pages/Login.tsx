@@ -31,7 +31,7 @@ export default function Login() {
       showToast('Welcome back', 'success')
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Invalid credentials')
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Invalid credentials')
     } finally {
       setLoading(false)
     }

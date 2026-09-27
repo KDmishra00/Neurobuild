@@ -14,24 +14,48 @@ const crypto = require('crypto');
 
 const CSRF_TTL_MS = 60 * 60 * 1000; // 1 hour
 const csrfTokens = new Map();
+const CSRF_SECRET = process.env.JWT_SECRET || 'neurobuild-csrf-default-secret-fallback';
 
 function issueCsrfToken() {
-  const token = crypto.randomBytes(32).toString('hex');
-  csrfTokens.set(token, Date.now() + CSRF_TTL_MS);
+  const timestamp = Date.now();
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const payload = `${timestamp}.${nonce}`;
+  const sig = crypto.createHmac('sha256', CSRF_SECRET).update(payload).digest('hex');
+  const token = `${payload}.${sig}`;
+  csrfTokens.set(token, timestamp + CSRF_TTL_MS);
   return token;
 }
 
 function validateCsrfToken(token) {
-  if (!token) return false;
-  const expiresAt = csrfTokens.get(token);
-  if (!expiresAt) return false;
-  if (expiresAt <= Date.now()) {
+  if (!token || typeof token !== 'string') return false;
+
+  // 1. Check in-memory store if present (for single-instance / local tests)
+  if (csrfTokens.has(token)) {
+    const expiresAt = csrfTokens.get(token);
     csrfTokens.delete(token);
-    return false;
+    if (expiresAt > Date.now()) return true;
   }
-  // Single-use: consume the token after validation
-  csrfTokens.delete(token);
-  return true;
+
+  // 2. Stateless HMAC verification (crucial for multi-instance / serverless cold starts)
+  const parts = token.split('.');
+  if (parts.length === 3) {
+    const [timestampStr, nonce, sig] = parts;
+    const timestamp = parseInt(timestampStr, 10);
+    if (isNaN(timestamp)) return false;
+    const now = Date.now();
+    // Valid within TTL (and allow 60s clock skew)
+    if (now - timestamp > CSRF_TTL_MS || now < timestamp - 60000) {
+      return false;
+    }
+    const expectedSig = crypto.createHmac('sha256', CSRF_SECRET).update(`${timestampStr}.${nonce}`).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expectedSig, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 // Sweep expired tokens every 15 minutes

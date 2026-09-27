@@ -37,16 +37,37 @@ app.use(helmet({
 // Request ID for log correlation
 app.use(requestId);
 
-// CORS - restrict to specific origins in production
+// CORS - allow production domains, previews, and local development
 const defaultOrigins = [
   'https://neurobuild.vercel.app',
   'https://kdmishra00.github.io'
 ];
+const customOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+const allowedOriginSet = new Set([...defaultOrigins, ...customOrigins]);
+
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || defaultOrigins
-    : true,
-  credentials: true
+  origin: (origin, callback) => {
+    // Non-browser or same-origin requests (curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const isAllowed =
+      allowedOriginSet.has(origin) ||
+      /^https:\/\/neurobuild.*\.vercel\.app$/.test(origin) ||
+      /^https:\/\/.*\.github\.io$/.test(origin) ||
+      /^http:\/\/localhost:\d+$/.test(origin) ||
+      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin);
+
+    if (isAllowed || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Id']
 };
 app.use(cors(corsOptions));
 
@@ -93,7 +114,9 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : (mongoose.connection.readyState === 2 ? 'connecting' : 'disconnected'),
+    hasMongoUri: !!process.env.MONGODB_URI,
+    environment: process.env.NODE_ENV || 'development',
     requestId: req.requestId
   });
 });

@@ -44,7 +44,7 @@ export default function Register() {
       showToast('Account created successfully', 'success')
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Registration failed')
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Registration failed')
     } finally {
       setLoading(false)
     }
