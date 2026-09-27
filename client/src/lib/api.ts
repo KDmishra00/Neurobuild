@@ -2,7 +2,11 @@ import axios from 'axios'
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 import type { User, Project, Conversation, Model, FileAttachment, GenerateResponse, AnalyzeResponse } from '../types'
 
-const API_URL = '/api'
+// When deployed to GitHub Pages (static), point API calls to the Vercel backend.
+// Set VITE_API_URL in the GitHub Actions workflow or .env file.
+// Fallback to /api for local dev and Vercel (where the backend is on the same host).
+const API_URL = import.meta.env.VITE_API_URL || '/api'
+
 
 class ApiClient {
   private client: AxiosInstance

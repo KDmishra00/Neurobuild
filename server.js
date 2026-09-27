@@ -38,9 +38,13 @@ app.use(helmet({
 app.use(requestId);
 
 // CORS - restrict to specific origins in production
+const defaultOrigins = [
+  'https://neurobuild.vercel.app',
+  'https://kdmishra00.github.io'
+];
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
-    ? process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
+    ? process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || defaultOrigins
     : true,
   credentials: true
 };

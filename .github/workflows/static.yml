@@ -41,6 +41,7 @@ jobs:
         working-directory: client
         env:
           VITE_BASE_URL: /Neurobuild/
+          VITE_API_URL: https://neurobuild.vercel.app/api
 
       - name: Add 404.html for SPA routing
         run: cp client/dist/index.html client/dist/404.html
