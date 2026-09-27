@@ -53,7 +53,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // OpenAI GPT-6 Astra & Experiential Labs Gateway configuration
 const ASTRA_API_URL = process.env.ASTRA_API_URL || 'https://api.experientiallabs.ai/v1/chat/completions';
-const ASTRA_API_KEY = process.env.ASTRA_API_KEY || 'xpl_d28db4e05d739352f3bcee244d70051629edfb59';
+const ASTRA_API_KEY = process.env.ASTRA_API_KEY || 'xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
 
 // ═══════════════════════════════════════════
 // SYSTEM PROMPTS
@@ -350,8 +350,8 @@ class AIService {
       });
 
       // Experiential Labs key fallback if 401
-      if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_d28db4e05d739352f3bcee244d70051629edfb59') {
-        headers.Authorization = 'Bearer xpl_d28db4e05d739352f3bcee244d70051629edfb59';
+      if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784') {
+        headers.Authorization = 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
         response = await fetch(apiUrl, {
           method: 'POST',
           headers,
@@ -832,8 +832,8 @@ class AIService {
     });
 
     // Experiential Labs key fallback if 401
-    if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_d28db4e05d739352f3bcee244d70051629edfb59') {
-      headers.Authorization = 'Bearer xpl_d28db4e05d739352f3bcee244d70051629edfb59';
+    if (!response.ok && isAstra && response.status === 401 && headers.Authorization !== 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784') {
+      headers.Authorization = 'Bearer xpl_f30e6a6bf7a0a0f1083a833814ee5c2d5994a784';
       response = await fetch(apiUrl, {
         method: 'POST',
         headers,
