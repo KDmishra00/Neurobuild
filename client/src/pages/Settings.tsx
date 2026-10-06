@@ -46,7 +46,14 @@ export default function Settings() {
   useEffect(() => {
     api.getModels()
       .then(({ models }) => {
-        const mapped = models.map((m) => ({ value: m.id, label: m.name }))
+        const merged = [...models]
+        for (const ds of [
+          { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat' },
+          { id: 'deepseek/deepseek-reasoner', name: 'DeepSeek R1 Reasoner' }
+        ]) {
+          if (!merged.some(m => m.id === ds.id)) merged.push(ds as any)
+        }
+        const mapped = merged.map((m) => ({ value: m.id, label: m.name }))
         setModels(mapped)
         // If the saved model no longer exists, fall back to the first available one
         setModel((prev) => (prev && mapped.some((m) => m.value === prev) ? prev : mapped[0]?.value || ''))

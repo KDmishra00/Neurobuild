@@ -145,6 +145,13 @@ describe('AIService — Utilities', () => {
       expect(aiService.isOpenAIModel('openai/gpt-4o-mini:cloud')).toBe(true);
     });
 
+    test('should resolve Astra to Groq 120B when default/revoked key is present', () => {
+      const config = aiService._resolveCloudConfig('openai/gpt-6-astra:cloud');
+      expect(config.isAstra).toBe(true);
+      expect(config.hasCustomAstra).toBe(false);
+      expect(config.modelName).toBe('openai/gpt-oss-120b');
+    });
+
     test('should not flag Ollama cloud models', () => {
       expect(aiService.isExternalCloudModel('kimi-k2.5:cloud')).toBe(false);
     });

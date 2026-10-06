@@ -30,6 +30,9 @@ function hasValidApiKey(model) {
   if (aiService.isMoonshotModel(model)) {
     return !!process.env.MOONSHOT_API_KEY && !process.env.MOONSHOT_API_KEY.includes('your_');
   }
+  if (aiService.isDeepSeekModel(model)) {
+    return !!process.env.DEEPSEEK_API_KEY && !process.env.DEEPSEEK_API_KEY.includes('your_');
+  }
   return !!process.env.CLOUD_API_KEY && !process.env.CLOUD_API_KEY.includes('your_');
 }
 
@@ -76,6 +79,20 @@ const STATIC_MODEL_OPTIONS = [
     type: 'cloud',
     provider: 'Experiential Labs',
     description: 'OpenAI GPT-6 Luna — ultra-fast next-gen GPT-6 model'
+  },
+  {
+    id: 'deepseek/deepseek-chat',
+    name: 'DeepSeek V3 Chat',
+    type: 'cloud',
+    provider: 'DeepSeek',
+    description: 'DeepSeek V3 — state-of-the-art open-source model, great for coding & web generation'
+  },
+  {
+    id: 'deepseek/deepseek-reasoner',
+    name: 'DeepSeek R1 Reasoner',
+    type: 'cloud',
+    provider: 'DeepSeek',
+    description: 'DeepSeek R1 — powerful reasoning model, chain-of-thought web generation'
   }
 ];
 
@@ -89,11 +106,11 @@ const generateLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// Local Ollama model used whenever a cloud model is unavailable or fails.
-// On cloud environments (Vercel) or when Ollama is unavailable, fallback to Groq.
-const LOCAL_FALLBACK_MODEL = (process.env.VERCEL || process.env.NODE_ENV === 'production')
+// Reliable fallback model used whenever any local or cloud model is unavailable or fails.
+// Favors Groq if GROQ_API_KEY is configured so users are never blocked by offline Ollama.
+const LOCAL_FALLBACK_MODEL = process.env.GROQ_API_KEY
   ? 'groq/openai/gpt-oss-120b:cloud'
-  : (process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud');
+  : (process.env.OLLAMA_MODEL || 'qwen3:14b');
 
 const MAX_PROMPT_LENGTH = 10_000;
 
@@ -138,15 +155,22 @@ router.post('/generate', generateLimiter, auth, validateGenerate, async (req, re
       try {
         site = await aiService.generateSite(prompt, modelToUse);
       } catch (err) {
-        // A cloud provider that rejects the request (invalid/expired key,
-        // unknown model, quota) must not block generation — retry locally.
-        if (isCloud) {
-          console.warn(`Cloud generation failed (${err.message}); falling back to ${LOCAL_FALLBACK_MODEL}`);
-          fallback = true;
-          modelToUse = LOCAL_FALLBACK_MODEL;
-          site = await aiService.generateSite(prompt, modelToUse);
-        } else {
-          throw err;
+        console.warn(`Generation failed with ${modelToUse} (${err.message}); attempting fallback`);
+        fallback = true;
+        try {
+          if (process.env.GROQ_API_KEY && modelToUse !== 'groq/openai/gpt-oss-120b:cloud') {
+            console.warn(`[Fallback] Switching to Groq LPU (openai/gpt-oss-120b)`);
+            modelToUse = 'groq/openai/gpt-oss-120b:cloud';
+            site = await aiService.generateSite(prompt, modelToUse);
+          } else if (modelToUse !== LOCAL_FALLBACK_MODEL) {
+            console.warn(`[Fallback] Switching to ${LOCAL_FALLBACK_MODEL}`);
+            modelToUse = LOCAL_FALLBACK_MODEL;
+            site = await aiService.generateSite(prompt, modelToUse);
+          } else {
+            throw err;
+          }
+        } catch (fallbackErr) {
+          throw fallbackErr;
         }
       }
       aiService.setCached(prompt, modelToUse, site);
@@ -203,13 +227,21 @@ router.get('/stream-generate', generateLimiter, auth, async (req, res) => {
         res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
       }
     } catch (err) {
-      if (!isCloud || fullHtml) throw err;
-      console.warn(`Cloud stream failed (${err.message}); falling back to ${LOCAL_FALLBACK_MODEL}`);
+      if (fullHtml) throw err;
+      console.warn(`Stream failed with ${modelToUse} (${err.message}); falling back to reliable model`);
       fallback = true;
-      modelToUse = LOCAL_FALLBACK_MODEL;
-      for await (const chunk of aiService.streamGenerate(prompt, modelToUse)) {
-        fullHtml += chunk;
-        res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+      if (process.env.GROQ_API_KEY && modelToUse !== 'groq/openai/gpt-oss-120b:cloud') {
+        modelToUse = 'groq/openai/gpt-oss-120b:cloud';
+      } else {
+        modelToUse = LOCAL_FALLBACK_MODEL;
+      }
+      try {
+        for await (const chunk of aiService.streamGenerate(prompt, modelToUse)) {
+          fullHtml += chunk;
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        }
+      } catch (fallbackErr) {
+        throw fallbackErr;
       }
     }
 
@@ -418,9 +450,9 @@ router.post('/chat', generateLimiter, auth, async (req, res) => {
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (!hasValidApiKey(modelToUse) && aiService.isExternalCloudModel(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     let conversation;
@@ -486,9 +518,9 @@ router.get('/stream-chat', generateLimiter, auth, async (req, res) => {
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (!hasValidApiKey(modelToUse) && aiService.isExternalCloudModel(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     let conversation;
@@ -632,9 +664,9 @@ router.post('/generate/design-system', generateLimiter, auth, async (req, res) =
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     const designSystem = await aiService.generateDesignSystem(prompt, modelToUse);
@@ -654,9 +686,9 @@ router.post('/generate/content', generateLimiter, auth, async (req, res) => {
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     const content = await aiService.generateContent(prompt, type || 'general', modelToUse);
@@ -676,9 +708,9 @@ router.post('/generate/suggest', generateLimiter, auth, async (req, res) => {
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     const suggestions = await aiService.suggestImprovements(html, modelToUse);
@@ -703,9 +735,9 @@ router.post('/analyze-and-generate', generateLimiter, auth, async (req, res) => 
     }
 
     // Use explicit model, or user's cloud model preference, or local default
-    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : process.env.OLLAMA_MODEL) || 'qwen3:14b';
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
     if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
-      modelToUse = process.env.OLLAMA_MODEL || 'qwen3:14b';
+      modelToUse = LOCAL_FALLBACK_MODEL;
     }
 
     // Build enhanced prompt with file context

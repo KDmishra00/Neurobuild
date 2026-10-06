@@ -131,19 +131,34 @@ export default function Dashboard() {
     document.addEventListener('mouseup', onUp)
   }
 
+const DEEPSEEK_MODELS: Model[] = [
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat', type: 'cloud', description: 'DeepSeek V3 — flagship code & chat model' },
+  { id: 'deepseek/deepseek-reasoner', name: 'DeepSeek R1 Reasoner', type: 'cloud', description: 'DeepSeek R1 — chain-of-thought reasoning model' }
+]
+
   useEffect(() => {
     let cancelled = false
     api.getModels()
       .then(({ models }) => {
         if (cancelled) return
-        setModels(models)
-        if (models.length > 0) {
+        const merged = [...models]
+        for (const ds of DEEPSEEK_MODELS) {
+          if (!merged.some((m) => m.id === ds.id)) merged.push(ds)
+        }
+        setModels(merged)
+        if (merged.length > 0) {
           const saved = user?.settings?.model
-          const exists = saved && models.some((m) => m.id === saved)
-          setModel(exists ? saved : models.find((m) => m.type === 'cloud')?.id || models[0].id)
+          const exists = saved && merged.some((m) => m.id === saved)
+          setModel(exists ? saved : merged.find((m) => m.type === 'cloud')?.id || merged[0].id)
         }
       })
-      .catch(() => { if (!cancelled) showToast('Failed to load models', 'error') })
+      .catch(() => {
+        if (!cancelled) {
+          setModels(DEEPSEEK_MODELS)
+          setModel(DEEPSEEK_MODELS[0].id)
+          showToast('Failed to load models', 'error')
+        }
+      })
     return () => { cancelled = true }
   }, [user, showToast])
 

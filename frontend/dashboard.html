@@ -350,7 +350,16 @@ body.hero-visible { overflow-y: auto; }
 .preview-pane-new {
   flex: 1;
   position: relative;
-  background: #fff; /* iframe needs white background usually */
+  background: #fff;
+  overflow: hidden;
+}
+.preview-pane-new iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  position: absolute;
+  inset: 0;
 }
 .empty-state {
   position: absolute;
@@ -362,6 +371,7 @@ body.hero-visible { overflow-y: auto; }
   gap: 16px;
   color: var(--text3);
   background: var(--surface2);
+  z-index: 1;
 }
 .empty-state svg {
   color: var(--border2);
@@ -844,11 +854,14 @@ let currentProjectId = null;
 
 // === MODELS ===
 const FALLBACK_MODELS = [
+  { id: 'groq/openai/gpt-oss-120b:cloud', name: 'OpenAI GPT-OSS 120B (Groq — Recommended)' },
+  { id: 'groq/openai/gpt-oss-20b:cloud', name: 'OpenAI GPT-OSS 20B (Groq)' },
+  { id: 'groq/qwen/qwen3.8-27b:cloud', name: 'Qwen 3.8 27B (Groq)' },
   { id: 'openai/gpt-6-astra:cloud', name: 'OpenAI GPT-6 Astra (Experiential Labs)' },
-  { id: 'openai/gpt-4o:cloud', name: 'OpenAI GPT-4o (OpenAI)' },
-  { id: 'openai/gpt-4o-mini:cloud', name: 'OpenAI GPT-4o Mini (OpenAI)' },
-  { id: 'qwen3:14b', name: 'Qwen3 14B (Local)' },
-  { id: 'qwen2.5-coder:7b', name: 'Qwen2.5 Coder 7B (Local)' }
+  { id: 'openai/gpt-6-sol:cloud', name: 'OpenAI GPT-6 Sol (Experiential Labs)' },
+  { id: 'openai/gpt-6-luna:cloud', name: 'OpenAI GPT-6 Luna (Experiential Labs)' },
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat' },
+  { id: 'deepseek/deepseek-reasoner', name: 'DeepSeek R1 Reasoner' }
 ];
 
 function renderModelOptions(models) {
@@ -860,13 +873,24 @@ function renderModelOptions(models) {
   select.value = currentModel;
 }
 
+// DeepSeek models — always injected (API key configured server-side)
+const DEEPSEEK_MODELS = [
+  { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 Chat · cloud' },
+  { id: 'deepseek/deepseek-reasoner', name: 'DeepSeek R1 Reasoner · cloud' }
+];
+
 async function loadModels() {
   try {
     const res = await fetch('/api/models', { headers: { 'Authorization': `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Model API failed: ${res.status}`);
     const data = await res.json();
     if (!data.models?.length) throw new Error('No models returned');
-    renderModelOptions(data.models);
+    // Merge DeepSeek if not already returned by the server
+    const merged = [...data.models];
+    for (const ds of DEEPSEEK_MODELS) {
+      if (!merged.some(m => m.id === ds.id)) merged.push(ds);
+    }
+    renderModelOptions(merged);
   } catch (e) {
     console.log('Models load failed, using fallback list:', e);
     renderModelOptions(FALLBACK_MODELS);
@@ -1149,8 +1173,8 @@ function parseGeneratedCode(html) {
 /** Apply a server-validated site object, with legacy HTML as a fallback. */
 function applyGeneratedSite(site, fallbackHtml) {
   const emptyState = document.getElementById('previewEmptyState');
-  if(emptyState) emptyState.style.display = 'none';
-  
+  if (emptyState) emptyState.style.display = 'none';
+
   if (site && typeof site.html === 'string' && typeof site.css === 'string' && typeof site.js === 'string') {
     generatedCode = { html: site.html, css: site.css, js: site.js };
     fullGeneratedHTML = site.document || rebuildFullHTML();
@@ -1158,19 +1182,33 @@ function applyGeneratedSite(site, fallbackHtml) {
     fullGeneratedHTML = fallbackHtml || '';
     parseGeneratedCode(fullGeneratedHTML);
   }
-  renderPreview(fullGeneratedHTML);
+
+  // Ensure we have HTML to render before calling renderPreview
+  if (fullGeneratedHTML && fullGeneratedHTML.trim().length > 10) {
+    renderPreview(fullGeneratedHTML);
+  } else if (fallbackHtml && fallbackHtml.trim().length > 10) {
+    renderPreview(fallbackHtml);
+  }
+
   switchCodeTab('html');
 }
 
 // === PREVIEW ===
 function renderPreview(html) {
   const pane = document.getElementById('previewPane');
+  // Remove old iframe if present
   const old = pane.querySelector('iframe');
   if (old) old.remove();
+
+  // Hide empty state
+  const emptyState = document.getElementById('previewEmptyState');
+  if (emptyState) emptyState.style.display = 'none';
+
   const iframe = document.createElement('iframe');
   iframe.title = 'Generated website preview';
   iframe.sandbox = 'allow-scripts';
   iframe.referrerPolicy = 'no-referrer';
+  // srcdoc is set last to ensure all attributes are applied before load
   iframe.srcdoc = buildPreviewDocument(html);
   pane.appendChild(iframe);
 }
@@ -1201,8 +1239,11 @@ function buildPreviewDocument(html) {
 // === CODE DISPLAY ===
 function updateCodeDisplay() {
   const code = generatedCode[currentCodeTab] || '';
-  document.getElementById('codeEditor').value = code;
-  document.getElementById('codeHighlighted').innerHTML = syntaxHighlight(code, currentCodeTab);
+  const el = document.getElementById('codeDisplayArea');
+  if (el) el.innerHTML = syntaxHighlight(code, currentCodeTab) || '<span style="opacity:0.4">// No code for this tab yet</span>';
+  // Keep textarea in sync if it exists (edit mode)
+  const ta = document.getElementById('codeEditor');
+  if (ta) ta.value = code;
 }
 
 function switchCodeTab(tab, btn) {
@@ -1270,19 +1311,23 @@ function toggleEdit() {
 }
 
 let liveEditTimer;
-document.getElementById('codeEditor').addEventListener('input', () => {
-  clearTimeout(liveEditTimer);
-  liveEditTimer = setTimeout(() => {
-    if (isEditing) applyCodeEdits();
-  }, 600);
-});
+// Live edit listener — only wired if a codeEditor textarea is present
+(function() {
+  const ta = document.getElementById('codeEditor');
+  if (ta) ta.addEventListener('input', () => {
+    clearTimeout(liveEditTimer);
+    liveEditTimer = setTimeout(() => { if (isEditing) applyCodeEdits(); }, 600);
+  });
+})();
 
 function applyCodeEdits() {
-  const code = document.getElementById('codeEditor').value;
+  const ta = document.getElementById('codeEditor');
+  const code = ta ? ta.value : (generatedCode[currentCodeTab] || '');
   generatedCode[currentCodeTab] = code;
   fullGeneratedHTML = rebuildFullHTML();
   renderPreview(fullGeneratedHTML);
-  document.getElementById('codeHighlighted').innerHTML = syntaxHighlight(code, currentCodeTab);
+  const el = document.getElementById('codeDisplayArea');
+  if (el) el.innerHTML = syntaxHighlight(code, currentCodeTab);
 }
 
 function rebuildFullHTML() {
@@ -1539,8 +1584,10 @@ function createNewProject() {
   updatePromptCount();
   document.getElementById('placeholder').style.display = '';
   document.getElementById('previewPane').querySelector('iframe')?.remove();
-  document.getElementById('codeEditor').value = '';
-  document.getElementById('codeHighlighted').textContent = '';
+  const ta = document.getElementById('codeEditor');
+  if (ta) ta.value = '';
+  const el = document.getElementById('codeDisplayArea');
+  if (el) el.innerHTML = '&lt;!-- generated markup appears here --&gt;';
   document.getElementById('promptInput').focus();
   renderProjects();
   showToast('New project ready');

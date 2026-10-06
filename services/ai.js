@@ -51,6 +51,13 @@ function getGroqKey() {
   return process.env.GROQ_API_KEY || '';
 }
 
+const VALID_GROQ_MODELS = new Set([
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b',
+  'allam-2-7b'
+]);
+
 // OpenAI Direct API configuration
 const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -58,6 +65,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 // OpenAI GPT-6 Astra & Experiential Labs Gateway configuration
 const ASTRA_API_URL = process.env.ASTRA_API_URL || 'https://api.experientiallabs.ai/v1/chat/completions';
 const ASTRA_API_KEY = process.env.ASTRA_API_KEY;
+
+// DeepSeek API configuration
+const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
 // ═══════════════════════════════════════════
 // SYSTEM PROMPTS
@@ -345,21 +356,37 @@ class AIService {
    */
   async _fetchGroqChat(messages, options = {}) {
     const isStream = !!options.stream;
-    const requestedModel = (options.model || 'openai/gpt-oss-120b').replace(/^groq\//, '');
+    let requestedModel = (options.model || 'openai/gpt-oss-120b')
+      .replace(/^groq\//, '')
+      .replace(/:cloud$/, '');
 
-    // Candidate models for failover
+    // Map any non-Groq model to a validated Groq model
+    if (!VALID_GROQ_MODELS.has(requestedModel)) {
+      if (requestedModel.includes('20b')) {
+        requestedModel = 'openai/gpt-oss-20b';
+      } else if (requestedModel.includes('27b') || requestedModel.includes('qwen')) {
+        requestedModel = 'qwen/qwen3.8-27b';
+      } else {
+        requestedModel = 'openai/gpt-oss-120b';
+      }
+    }
+
+    // Candidate models for failover (strictly valid Groq models only)
     const candidateModels = [
       requestedModel,
       'openai/gpt-oss-120b',
       'qwen/qwen3.8-27b',
       'openai/gpt-oss-20b'
-    ].filter((m, i, arr) => arr.indexOf(m) === i);
+    ].filter((m, i, arr) => arr.indexOf(m) === i && VALID_GROQ_MODELS.has(m));
 
-    // Calculate safe max_tokens so (promptTokens + max_tokens) stays under Groq's 8000 TPM limit
+    // Calculate safe max_tokens.  Groq's free-tier rate limit is ~6000 TPM,
+    // but individual requests can use up to 65536 completion tokens.  We set a
+    // generous default (8192) so website generation isn't truncated.  If TPM is
+    // exceeded, the failover loop already retries with smaller candidate models.
+    const callerMaxTokens = options.max_tokens;
     const totalChars = (messages || []).reduce((acc, m) => acc + (String(m.content || '').length), 0);
     const estimatedInputTokens = Math.ceil(totalChars / 3.5);
-    // Keep total tokens (input + output) <= 7200 to prevent HTTP 413 "Request too large"
-    const maxTokens = Math.max(1024, Math.min(2500, 7200 - estimatedInputTokens));
+    const maxTokens = callerMaxTokens || Math.max(2048, Math.min(8192, 32000 - estimatedInputTokens));
 
     const apiKey = getGroqKey();
     let lastError = null;
@@ -388,10 +415,10 @@ class AIService {
           return { response, modelUsed: model };
         }
 
-        // If rate limited or request too large (TPM limit exceeded), failover to next model
-        if (response.status === 413 || response.status === 429) {
+        // If rate limited, TPM exceeded, or model not found/invalid, failover to next candidate model
+        if (response.status === 413 || response.status === 429 || response.status === 404 || response.status === 400) {
           const detail = await response.text().catch(() => '');
-          console.warn(`[Groq] ${model} returned ${response.status} (TPM/Rate Limit); failing over to next model. Detail: ${detail.slice(0, 100)}`);
+          console.warn(`[Groq] ${model} returned ${response.status}; failing over to next model. Detail: ${detail.slice(0, 100)}`);
           lastError = new Error(`Groq ${model} (${response.status}): ${detail.slice(0, 150)}`);
           continue;
         }
@@ -400,7 +427,7 @@ class AIService {
         const detail = await response.text().catch(() => '');
         throw new Error(`Groq API error (${response.status}): ${detail.slice(0, 200)}`);
       } catch (err) {
-        if (err.message.includes('413') || err.message.includes('429')) {
+        if (err.message.includes('413') || err.message.includes('429') || err.message.includes('404') || err.message.includes('400')) {
           lastError = err;
           continue;
         }
@@ -414,10 +441,33 @@ class AIService {
   /** Complete a non-streaming request with either configured provider. */
   async _complete(messages, model) {
     if (this.isExternalCloudModel(model)) {
-      const { apiUrl, modelName, headers, isAstra, isGroq } = this._resolveCloudConfig(model);
+      const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
 
-      if (isGroq || isAstra) {
+      if (isGroq) {
         const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
+      }
+
+      if (isAstra) {
+        if (hasCustomAstra) {
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ model: modelName, max_tokens: 4096, messages })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              return data.choices?.[0]?.message?.content || '';
+            }
+            console.warn(`[Astra] Gateway returned status ${response.status}; falling back to Groq`);
+          } catch (err) {
+            console.warn(`[Astra] Gateway request failed (${err.message}); falling back to Groq`);
+          }
+        }
+        // Direct route or fallback to Groq with flagship 120B model
+        const { response } = await this._fetchGroqChat(messages, { model: 'openai/gpt-oss-120b', stream: false });
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
       }
@@ -450,12 +500,18 @@ class AIService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ollamaChatOptions({ model, stream: false, messages }))
       });
+      if (!response.ok) throw new Error(`Ollama API error: ${response.status}`);
+      const data = await response.json();
+      return data.message?.content || '';
     } catch (err) {
+      if (getGroqKey()) {
+        console.warn(`[Local Model] Ollama call failed (${err.cause?.code || err.message}); seamlessly falling back to Groq LPU`);
+        const { response: fallbackRes } = await this._fetchGroqChat(messages, { stream: false });
+        const data = await fallbackRes.json();
+        return data.choices?.[0]?.message?.content || '';
+      }
       throw new Error(`Cannot reach Ollama at ${OLLAMA_URL} (${err.cause?.code || err.message}). Is Ollama running and is the model pulled?`);
     }
-    if (!response.ok) throw new Error(`Ollama API error: ${response.status}`);
-    const data = await response.json();
-    return data.message?.content || '';
   }
 
   // ═══════════════════════════════════════════
@@ -466,30 +522,14 @@ class AIService {
    * Stage 1: Generate raw website code from prompt
    */
   async runGenerator(prompt, model = null) {
-    const targetModel = model || process.env.PIPELINE_MODEL_GENERATOR || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+    const targetModel = model || process.env.PIPELINE_MODEL_GENERATOR || process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud';
     console.log(`[Pipeline] Stage 1: Generating code with ${targetModel}...`);
     const specification = this.buildWebsiteSpecification(prompt);
-    const response = await ollamaFetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ollamaChatOptions({
-        model: targetModel,
-        stream: false,
-        messages: [
-          { role: 'system', content: GENERATOR_PROMPT },
-          { role: 'user', content: `Generate a complete website based on this specification:\n\n${specification}` }
-        ]
-      }))
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Generator (Stage 1) failed: ${error}`);
-    }
-
-    const data = await response.json();
-    let html = data.message?.content || '';
-    html = this.cleanHtml(html);
+    const output = await this._complete([
+      { role: 'system', content: GENERATOR_PROMPT },
+      { role: 'user', content: `Generate a complete website based on this specification:\n\n${specification}` }
+    ], targetModel);
+    const html = this.cleanHtml(output);
     console.log('[Pipeline] Stage 1 complete. HTML length:', html.length);
     return html;
   }
@@ -499,7 +539,7 @@ class AIService {
    * Routes through _complete so any model (local, Groq, NVIDIA NIM, cloud) works.
    */
   async editWebsite(rawHtml, instruction, model = null) {
-    const targetModel = model || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+    const targetModel = model || process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud';
     console.log(`[Edit] Applying "${String(instruction).slice(0, 80)}" with ${targetModel}...`);
     const output = await this._complete([
       { role: 'system', content: EDIT_PROMPT },
@@ -514,29 +554,13 @@ class AIService {
    * Stage 2: Refine and optimize the raw code
    */
   async runRefiner(rawHtml, instruction = 'Improve and optimize this website code:', model = null) {
-    const targetModel = model || process.env.PIPELINE_MODEL_REFINER || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+    const targetModel = model || process.env.PIPELINE_MODEL_REFINER || process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud';
     console.log(`[Pipeline] Stage 2: Refining code with ${targetModel}...`);
-    const response = await ollamaFetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ollamaChatOptions({
-        model: targetModel,
-        stream: false,
-        messages: [
-          { role: 'system', content: REFINER_PROMPT },
-          { role: 'user', content: `${instruction}\n\n${rawHtml}` }
-        ]
-      }))
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Refiner (Stage 2) failed: ${error}`);
-    }
-
-    const data = await response.json();
-    let html = data.message?.content || '';
-    html = this.cleanHtml(html);
+    const output = await this._complete([
+      { role: 'system', content: REFINER_PROMPT },
+      { role: 'user', content: `${instruction}\n\n${rawHtml}` }
+    ], targetModel);
+    const html = this.cleanHtml(output);
     console.log('[Pipeline] Stage 2 complete. Final HTML length:', html.length);
     return html;
   }
@@ -550,42 +574,22 @@ class AIService {
     const specification = this.buildWebsiteSpecification(spec);
     
     // Promise.all to run inferences simultaneously
-    const [htmlOutput, jsOutput] = await Promise.all([
+    const [rawHtmlOutput, rawJsOutput] = await Promise.all([
       // Worker A -> HTML/CSS
-      ollamaFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ollamaChatOptions({
-          model: PIPELINE_MODEL_GENERATOR,
-          stream: false,
-          messages: [
-            { role: 'system', content: PARALLEL_HTML_PROMPT },
-            { role: 'user', content: `Generate the HTML and CSS for this specification:\n\n${specification}` }
-          ]
-        }))
-      }).then(r => r.json()),
+      this._complete([
+        { role: 'system', content: PARALLEL_HTML_PROMPT },
+        { role: 'user', content: `Generate the HTML and CSS for this specification:\n\n${specification}` }
+      ], PIPELINE_MODEL_GENERATOR || 'groq/openai/gpt-oss-120b:cloud'),
       
       // Worker B -> JavaScript
-      ollamaFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ollamaChatOptions({
-          model: PIPELINE_MODEL_REFINER,
-          stream: false,
-          messages: [
-            { role: 'system', content: PARALLEL_JS_PROMPT },
-            { role: 'user', content: `Generate the JavaScript interactions for this specification:\n\n${specification}` }
-          ]
-        }))
-      }).then(r => r.json())
+      this._complete([
+        { role: 'system', content: PARALLEL_JS_PROMPT },
+        { role: 'user', content: `Generate the JavaScript interactions for this specification:\n\n${specification}` }
+      ], PIPELINE_MODEL_REFINER || 'groq/openai/gpt-oss-120b:cloud')
     ]);
 
-    let html = htmlOutput.message?.content || '';
-    html = this.cleanHtml(html);
-    
-    let js = jsOutput.message?.content || '';
-    // Clean markdown off JS
-    js = js.replace(/^```(javascript|js)?\n?/i, '').replace(/```$/, '').trim();
+    let html = this.cleanHtml(rawHtmlOutput || '');
+    let js = (rawJsOutput || '').replace(/^```(javascript|js)?\n?/i, '').replace(/```$/, '').trim();
 
     // 🚀 Merger: Combine HTML/CSS with JavaScript
     if (!html.includes('</body>')) {
@@ -749,7 +753,8 @@ class AIService {
            this.isNvidiaModel(model) || 
            this.isGroqModel(model) ||
            this.isAstraModel(model) ||
-           this.isOpenAIModel(model);
+           this.isOpenAIModel(model) ||
+           this.isDeepSeekModel(model);
   }
 
   isNvidiaModel(model) {
@@ -787,6 +792,12 @@ class AIService {
     return clean.startsWith('openai/') || clean.includes('gpt-4o') || clean.includes('gpt-3.5') || clean.includes('gpt-4-turbo');
   }
 
+  isDeepSeekModel(model) {
+    if (!model) return false;
+    const clean = String(model).toLowerCase();
+    return clean.startsWith('deepseek/') || clean.includes('deepseek-chat') || clean.includes('deepseek-coder') || clean.includes('deepseek-reasoner');
+  }
+
   /** Resolve endpoint URL, API key, model ID and headers for any cloud model */
   _resolveCloudConfig(model) {
     const isAstra = this.isAstraModel(model);
@@ -794,14 +805,18 @@ class AIService {
     const isNvidia = this.isNvidiaModel(model);
     const isMoonshot = this.isMoonshotModel(model);
     const isGroq = this.isGroqModel(model);
+    const isDeepSeek = this.isDeepSeekModel(model);
 
     let apiUrl = CLOUD_API_URL;
     let apiKey = CLOUD_API_KEY;
     let modelName = (model || '').replace(':cloud', '').replace(/^groq\//, '');
 
+    let hasCustomAstra = false;
+
     if (isAstra) {
       const customKey = process.env.ASTRA_API_KEY;
-      const hasCustomAstra = !!(customKey && !customKey.includes('your_'));
+      // Key is considered custom only if set and not a placeholder or known revoked test key
+      hasCustomAstra = !!(customKey && !customKey.includes('your_') && !customKey.startsWith('xpl_f30e6a6bf7a0a0f1'));
       if (hasCustomAstra) {
         apiUrl = process.env.ASTRA_API_URL || ASTRA_API_URL;
         apiKey = customKey;
@@ -834,6 +849,11 @@ class AIService {
     } else if (isNvidia) {
       apiUrl = NVIDIA_API_URL;
       apiKey = NVIDIA_API_KEY;
+    } else if (isDeepSeek) {
+      apiUrl = DEEPSEEK_API_URL;
+      apiKey = DEEPSEEK_API_KEY;
+      // Strip the "deepseek/" prefix if present — the API uses model names like "deepseek-chat"
+      modelName = modelName.replace(/^deepseek\//, '');
     }
 
     const headers = {
@@ -841,12 +861,12 @@ class AIService {
       'Authorization': `Bearer ${apiKey}`,
       'User-Agent': 'Mozilla/5.0 (compatible; Neurobuild/2.0)'
     };
-    if (!isNvidia && !isGroq && !isAstra && !isOpenAI) {
+    if (!isNvidia && !isGroq && !isAstra && !isOpenAI && !isDeepSeek) {
       headers['HTTP-Referer'] = 'http://localhost:3000';
       headers['X-Title'] = 'Neurobuild';
     }
 
-    return { apiUrl, apiKey, modelName, headers, isAstra, isOpenAI, isNvidia, isMoonshot, isGroq };
+    return { apiUrl, apiKey, modelName, headers, isAstra, isOpenAI, isNvidia, isMoonshot, isGroq, isDeepSeek, hasCustomAstra };
   }
 
   // Backward-compatible helper
@@ -856,14 +876,38 @@ class AIService {
 
   // Generate using cloud API (OpenAI-compatible format)
   async generateCloud(prompt, model) {
-    const { apiUrl, modelName, headers, isAstra, isGroq } = this._resolveCloudConfig(model);
+    const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Create a website: ${prompt}` }
     ];
 
-    if (isGroq || isAstra) {
+    if (isGroq) {
       const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
+      const data = await response.json();
+      let html = data.choices?.[0]?.message?.content || '';
+      return this.cleanHtml(html);
+    }
+
+    if (isAstra) {
+      if (hasCustomAstra) {
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ model: modelName, max_tokens: 4096, messages })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            let html = data.choices?.[0]?.message?.content || '';
+            return this.cleanHtml(html);
+          }
+          console.warn(`[Cloud] Astra gateway returned status ${response.status}; seamlessly routing to Groq`);
+        } catch (err) {
+          console.warn(`[Cloud] Astra gateway failed (${err.message}); seamlessly routing to Groq`);
+        }
+      }
+      const { response } = await this._fetchGroqChat(messages, { model: 'openai/gpt-oss-120b', stream: false });
       const data = await response.json();
       let html = data.choices?.[0]?.message?.content || '';
       return this.cleanHtml(html);
@@ -894,16 +938,44 @@ class AIService {
 
   // Stream generate using cloud API (OpenAI-compatible SSE format)
   async *streamCloud(prompt, model, onChunk) {
-    const { apiUrl, modelName, headers, isAstra, isGroq } = this._resolveCloudConfig(model);
+    const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Create a website: ${prompt}` }
     ];
 
     let response;
-    if (isGroq || isAstra) {
+    if (isGroq) {
       const result = await this._fetchGroqChat(messages, { model: modelName, stream: true });
       response = result.response;
+    } else if (isAstra) {
+      let astraSuccess = false;
+      if (hasCustomAstra) {
+        try {
+          const astraRes = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: modelName,
+              stream: true,
+              max_tokens: 4096,
+              messages
+            })
+          });
+          if (astraRes.ok) {
+            response = astraRes;
+            astraSuccess = true;
+          } else {
+            console.warn(`[Cloud Stream] Astra gateway returned status ${astraRes.status}; seamlessly routing to Groq`);
+          }
+        } catch (err) {
+          console.warn(`[Cloud Stream] Astra gateway failed (${err.message}); seamlessly routing to Groq`);
+        }
+      }
+      if (!astraSuccess) {
+        const result = await this._fetchGroqChat(messages, { model: 'openai/gpt-oss-120b', stream: true });
+        response = result.response;
+      }
     } else {
       response = await fetch(apiUrl, {
         method: 'POST',
@@ -1067,12 +1139,35 @@ class AIService {
   /** Internal: stream chat from Ollama or cloud */
   async *_streamOllamaChat(messages, model) {
     if (this.isExternalCloudModel(model)) {
-      const { apiUrl, modelName, headers, isAstra, isGroq } = this._resolveCloudConfig(model);
+      const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
       let response;
 
-      if (isGroq || isAstra) {
+      if (isGroq) {
         const result = await this._fetchGroqChat(messages, { model: modelName, stream: true });
         response = result.response;
+      } else if (isAstra) {
+        let astraSuccess = false;
+        if (hasCustomAstra) {
+          try {
+            const astraRes = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ model: modelName, stream: true, max_tokens: 4096, messages })
+            });
+            if (astraRes.ok) {
+              response = astraRes;
+              astraSuccess = true;
+            } else {
+              console.warn(`[Cloud Stream Chat] Astra gateway returned status ${astraRes.status}; seamlessly routing to Groq`);
+            }
+          } catch (err) {
+            console.warn(`[Cloud Stream Chat] Astra gateway failed (${err.message}); seamlessly routing to Groq`);
+          }
+        }
+        if (!astraSuccess) {
+          const result = await this._fetchGroqChat(messages, { model: 'openai/gpt-oss-120b', stream: true });
+          response = result.response;
+        }
       } else {
         response = await fetch(apiUrl, {
           method: 'POST',
@@ -1112,13 +1207,47 @@ class AIService {
       return;
     }
 
-    // Ollama streaming
-    const response = await ollamaFetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(ollamaChatOptions({ model, stream: true, messages }))
-    });
-    if (!response.ok) throw new Error(`Ollama API error: ${response.status}`);
+    // Ollama streaming with Groq fallback if Ollama is down
+    let response;
+    try {
+      response = await ollamaFetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ollamaChatOptions({ model, stream: true, messages }))
+      });
+      if (!response.ok) throw new Error(`Ollama API error: ${response.status}`);
+    } catch (err) {
+      if (getGroqKey()) {
+        console.warn(`[Local Stream] Ollama unreachable (${err.cause?.code || err.message}); streaming via Groq LPU`);
+        const result = await this._fetchGroqChat(messages, { stream: true });
+        response = result.response;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+              if (line.trim().startsWith('data: ')) {
+                const payload = line.trim().slice(6);
+                if (payload === '[DONE]') return;
+                try {
+                  const data = JSON.parse(payload);
+                  const content = data.choices?.[0]?.delta?.content;
+                  if (content) yield content;
+                } catch {}
+              }
+            }
+          }
+        } finally { reader.releaseLock(); }
+        return;
+      }
+      throw new Error(`Cannot reach Ollama at ${OLLAMA_URL} (${err.cause?.code || err.message}). Is Ollama running?`);
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -1667,15 +1796,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
     } catch (err) {
-      console.warn('Ollama tags endpoint unreachable or timed out, returning configured model.');
+      return [];
     }
-
-    return [{
-      id: configuredModel,
-      name: `${configuredModel} (Local)`,
-      type: 'local',
-      description: 'Ollama Local Model'
-    }];
+    return [];
   }
 
   // Simple in-memory cache
