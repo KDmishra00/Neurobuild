@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -14,21 +14,89 @@ import { cn } from '../lib/utils'
 
 type CodeTab = 'html' | 'css' | 'js'
 
-function parseHtmlParts(raw: string) {
+function parseHtmlParts(raw: string, structuredSite?: any) {
+  if (structuredSite && (structuredSite.js || structuredSite.css || structuredSite.html)) {
+    return {
+      html: structuredSite.html || raw || '',
+      css: structuredSite.css || '',
+      js: structuredSite.js || ''
+    }
+  }
+
   let html = ''
   let css = ''
   let js = ''
 
-  const styleMatch = raw.match(/<style[^>]*>([\s\S]*?)<\/style>/i)
-  if (styleMatch) css = styleMatch[1].trim()
+  if (!raw) return { html, css, js }
 
-  const scriptMatch = raw.match(/<script[^>]*>([\s\S]*?)<\/script>/i)
-  if (scriptMatch) js = scriptMatch[1].trim()
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(raw, 'text/html')
 
-  html = raw
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .trim()
+    const styles: string[] = []
+    doc.querySelectorAll('style').forEach((s) => {
+      const content = s.textContent?.trim()
+      if (content) styles.push(content)
+    })
+    css = styles.join('\n\n')
+
+    const scripts: string[] = []
+    doc.querySelectorAll('script').forEach((s) => {
+      // Collect inline scripts (exclude external library tags with src)
+      if (!s.src) {
+        const content = s.textContent?.trim()
+        if (content) scripts.push(content)
+      }
+    })
+    js = scripts.join('\n\n')
+
+    // If DOMParser didn't extract scripts, use regex fallback
+    if (!js) {
+      const scriptRegex = /<script\b(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi
+      let match
+      while ((match = scriptRegex.exec(raw)) !== null) {
+        const content = match[1]?.trim()
+        if (content) scripts.push(content)
+      }
+      js = scripts.join('\n\n')
+    }
+
+    const clone = doc.cloneNode(true) as Document
+    clone.querySelectorAll('style, script').forEach((el) => el.remove())
+    const bodyContent = clone.querySelector('body')?.innerHTML || ''
+    let headContent = ''
+    clone.querySelectorAll('head > *').forEach((el) => {
+      headContent += el.outerHTML + '\n'
+    })
+
+    const cleanHtml = (headContent || bodyContent)
+      ? `<!DOCTYPE html>\n<html lang="en">\n<head>\n${headContent}</head>\n<body>\n${bodyContent.trim()}\n</body>\n</html>`
+      : raw.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '').trim()
+
+    html = cleanHtml.trim()
+  } catch {
+    // Regex fallback
+    const styleRegex = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
+    const styles: string[] = []
+    let sm
+    while ((sm = styleRegex.exec(raw)) !== null) {
+      if (sm[1]?.trim()) styles.push(sm[1].trim())
+    }
+    css = styles.join('\n\n')
+
+    const scriptRegex = /<script\b(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi
+    const scripts: string[] = []
+    let scm
+    while ((scm = scriptRegex.exec(raw)) !== null) {
+      if (scm[1]?.trim()) scripts.push(scm[1].trim())
+    }
+    js = scripts.join('\n\n')
+
+    html = raw
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .trim()
+  }
 
   return { html, css, js }
 }
@@ -52,6 +120,7 @@ export default function Dashboard() {
   const [editPrompt, setEditPrompt] = useState('')
   const [stage, setStage] = useState('')
   const [html, setHtml] = useState('')
+  const [site, setSite] = useState<any>(null)
   const [saved, setSaved] = useState(false)
 
   const [activeTab, setActiveTab] = useState<CodeTab>('html')
@@ -66,7 +135,7 @@ export default function Dashboard() {
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const codeParts = parseHtmlParts(html)
+  const codeParts = useMemo(() => parseHtmlParts(html, site), [html, site])
   const codeContent = codeParts[activeTab] || ''
 
   const updatePromptWidth = (w: number) => {
@@ -235,7 +304,7 @@ const DEEPSEEK_MODELS: Model[] = [
     setStage('Thinking...')
 
     try {
-      let result: { html: string; cached?: boolean; fallback?: boolean }
+      let result: any
       if (files.length > 0) {
         setStage('Analyzing files...')
         result = await api.analyzeAndGenerate(prompt, files, model)
@@ -245,6 +314,7 @@ const DEEPSEEK_MODELS: Model[] = [
       }
 
       setHtml(result.html)
+      setSite(result.site || null)
       if (result.fallback) showToast('Used fallback model', 'info')
       if (result.cached) showToast('Served from cache', 'info')
       setStage('')
@@ -581,7 +651,13 @@ const DEEPSEEK_MODELS: Model[] = [
             {codeContent ? (
               <span className="text-text">{codeContent}</span>
             ) : (
-              <span className="text-text3">// generated markup appears here</span>
+              <span className="text-text3">
+                {activeTab === 'js'
+                  ? '// No custom JavaScript required for this static layout'
+                  : activeTab === 'css'
+                  ? '/* No custom CSS */'
+                  : '// generated markup appears here'}
+              </span>
             )}
           </pre>
         </div>
