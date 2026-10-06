@@ -79,8 +79,8 @@ describe('Validate Middleware', () => {
       expect(res.statusCode).toBe(400);
     });
 
-    test('should accept prompts up to 10,000 characters', () => {
-      const req = mockReq({ prompt: 'x'.repeat(10_000) });
+    test('should accept prompts up to 100,000 characters', () => {
+      const req = mockReq({ prompt: 'x'.repeat(100_000) });
       const res = mockRes();
       const next = jest.fn();
       validateGenerate(req, res, next);
@@ -88,7 +88,7 @@ describe('Validate Middleware', () => {
     });
 
     test('should reject oversized prompt', () => {
-      const req = mockReq({ prompt: 'x'.repeat(10_001) });
+      const req = mockReq({ prompt: 'x'.repeat(100_001) });
       const res = mockRes();
       validateGenerate(req, res, () => {});
       expect(res.statusCode).toBe(400);

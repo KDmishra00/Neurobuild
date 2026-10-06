@@ -60,9 +60,7 @@ const validateLogin = (req, res, next) => {
 
 // Shared generation prompt budget. Measured in CHARACTERS, not words — an
 // average English word is ~5 characters, so 10,000 chars ≈ 2,000 words.
-// This comfortably fits long specs (e.g. pasted engine/system prompts) while
-// staying well inside local model context windows (qwen3:14b supports 32k+).
-const MAX_PROMPT_LENGTH = 10_000;
+const MAX_PROMPT_LENGTH = 100_000;
 
 const validateGenerate = (req, res, next) => {
   const { prompt } = req.body;
@@ -72,7 +70,7 @@ const validateGenerate = (req, res, next) => {
   }
 
   if (prompt.length > MAX_PROMPT_LENGTH) {
-    return res.status(400).json({ error: `Prompt cannot exceed ${MAX_PROMPT_LENGTH.toLocaleString()} characters (about 2,000 words)` });
+    return res.status(400).json({ error: `Prompt cannot exceed ${MAX_PROMPT_LENGTH.toLocaleString()} characters` });
   }
 
   next();

@@ -28,8 +28,8 @@ function validateProjectInput(input, { requireName = false } = {}) {
   if (input.name !== undefined && String(input.name).trim().length > 80) {
     errors.push('Project name cannot exceed 80 characters');
   }
-  if (input.prompt !== undefined && String(input.prompt).length > 10_000) {
-    errors.push('Prompt cannot exceed 10,000 characters');
+  if (input.prompt !== undefined && String(input.prompt).length > 100_000) {
+    errors.push('Prompt cannot exceed 100,000 characters');
   }
   if (input.html !== undefined && String(input.html).length > 2_000_000) {
     errors.push('Generated website is too large to save');

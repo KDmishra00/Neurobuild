@@ -112,7 +112,7 @@ const LOCAL_FALLBACK_MODEL = process.env.GROQ_API_KEY
   ? 'groq/openai/gpt-oss-120b:cloud'
   : (process.env.OLLAMA_MODEL || 'qwen3:14b');
 
-const MAX_PROMPT_LENGTH = 10_000;
+const MAX_PROMPT_LENGTH = 100_000;
 
 function validateStreamPrompt(prompt, res) {
   if (!prompt || !String(prompt).trim()) {
@@ -120,7 +120,7 @@ function validateStreamPrompt(prompt, res) {
     return false;
   }
   if (String(prompt).length > MAX_PROMPT_LENGTH) {
-    res.status(400).json({ error: `Prompt cannot exceed ${MAX_PROMPT_LENGTH.toLocaleString()} characters (about 2,000 words)` });
+    res.status(400).json({ error: `Prompt cannot exceed ${MAX_PROMPT_LENGTH.toLocaleString()} characters` });
     return false;
   }
   return true;

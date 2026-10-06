@@ -409,7 +409,6 @@ const DEEPSEEK_MODELS: Model[] = [
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe the website you want to build"
-              maxLength={10000}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault()
@@ -420,7 +419,6 @@ const DEEPSEEK_MODELS: Model[] = [
             />
             <div className="flex items-center justify-between text-xs text-text3 font-mono px-1">
               <span>{prompt.trim().split(/\s+/).filter(Boolean).length.toLocaleString()} words</span>
-              <span className={prompt.length > 9000 ? 'text-amber-500' : ''}>{prompt.length.toLocaleString()} / 10,000</span>
             </div>
 
             {/* File upload area */}
