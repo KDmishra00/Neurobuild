@@ -1,10 +1,6 @@
 # Render Blueprint — NeuroBuild
 # Import this file in Render: New + → Blueprint → Public Repository → paste your GitHub repo.
 # Render builds the Docker image and provisions an auto-deploying web service.
-#
-# Requirements:
-#   - A MongoDB Atlas cluster (see DEPLOYMENT.md) with a connection string.
-#   - A cloud AI provider key (OpenRouter / NVIDIA NIM). Ollama is local-only.
 
 services:
   - type: web
@@ -22,28 +18,9 @@ services:
         value: production
       - key: PORT
         value: "3000"
-      # Randomly generated at first deploy, persisted afterwards
       - key: JWT_SECRET
         generateValue: true
       - key: MONGODB_URI
         sync: false
-        # Set this manually after importing — your Atlas connection string
-        comment: "mongodb+srv://<user>:<password>@<cluster>.mongodb.net/neurobuild?retryWrites=true&w=majority"
-      - key: CLOUD_API_KEY
-        sync: false
-      - key: CLOUD_API_URL
-        value: https://openrouter.ai/api/v1/chat/completions
       - key: GROQ_API_KEY
         sync: false
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: OLLAMA_URL
-        sync: false
-      - key: OLLAMA_MODEL
-        value: qwen3:4b
-      - key: PIPELINE_ENABLED
-        value: "true"
-      - key: PIPELINE_MODEL_GENERATOR
-        value: qwen3:4b
-      - key: PIPELINE_MODEL_REFINER
-        value: qwen3:4b
