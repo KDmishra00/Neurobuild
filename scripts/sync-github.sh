@@ -13,9 +13,9 @@ echo -e "${BLUE}=== Neurobuild GitHub Sync ===${NC}"
 # Check current branch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-# Pull latest remote changes first to avoid conflicts
+# Pull latest remote changes safely without conflicting with local work
 echo -e "${YELLOW}Fetching latest updates from origin/$BRANCH...${NC}"
-git pull --rebase origin "$BRANCH" || true
+git pull --autostash --rebase origin "$BRANCH" 2>/dev/null || true
 
 # Pre-commit safety check: verify sensitive files are not accidentally committed
 if git status --porcelain | grep -qE "^\s*[AM\?].*(\.env$|\.env\.local$|\.rtf$|connection.*string)"; then
