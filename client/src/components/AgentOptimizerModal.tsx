@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import type { AgentEvent, AgentScores, AgentResult } from '../types'
-import { Button, Badge } from './ui'
+import { Button } from './ui'
 import {
   Sparkles,
   Bot,
@@ -251,9 +251,6 @@ export default function AgentOptimizerModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold text-text text-base">Autonomous Agentic Optimizer</h2>
-                <Badge className="bg-accent/15 text-accent border border-accent/30 text-xs font-mono">
-                  Module 6
-                </Badge>
               </div>
               <p className="text-xs text-text3">
                 Planner ➔ Executor ➔ Evaluator autonomous feedback cycle
