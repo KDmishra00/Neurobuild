@@ -40,7 +40,8 @@ app.use(requestId);
 // CORS - allow production domains, previews, and local development
 const defaultOrigins = [
   'https://neurobuild.vercel.app',
-  'https://kdmishra00.github.io'
+  'https://kdmishra00.github.io',
+  'https://neurobuild.onrender.com'
 ];
 const customOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
@@ -54,6 +55,7 @@ const corsOptions = {
 
     const isAllowed =
       allowedOriginSet.has(origin) ||
+      /^https:\/\/.*\.onrender\.com$/.test(origin) ||
       /^https:\/\/neurobuild.*\.vercel\.app$/.test(origin) ||
       /^https:\/\/.*\.github\.io$/.test(origin) ||
       /^http:\/\/localhost:\d+$/.test(origin) ||
