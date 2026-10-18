@@ -13,7 +13,8 @@
     "test:unit": "jest test/unit --forceExit",
     "test:logic": "jest test/unit/services test/unit/middleware --runInBand",
     "test:integration": "jest test/integration --forceExit --detectOpenHandles",
-    "test:watch": "jest --watch --forceExit"
+    "test:watch": "jest --watch --forceExit",
+    "sync": "bash scripts/sync-github.sh"
   },
   "jest": {
     "testEnvironment": "node",
