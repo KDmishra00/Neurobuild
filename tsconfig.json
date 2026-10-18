@@ -1,7 +1,12 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./client/tsconfig.app.json" },
-    { "path": "./client/tsconfig.node.json" }
-  ]
+  "compilerOptions": {
+    "target": "ES2022",
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowJs": true
+  },
+  "include": ["client/src"]
 }

@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
-import type { User, Project, Conversation, Model, FileAttachment, GenerateResponse, AnalyzeResponse } from '../types'
+import type { User, Project, Conversation, Model, FileAttachment, GenerateResponse, AnalyzeResponse, AgentEvent, AgentResult } from '../types'
 
 // When deployed to GitHub Pages (static), point API calls to the Vercel backend.
 // Set VITE_API_URL in the GitHub Actions workflow or .env file.
