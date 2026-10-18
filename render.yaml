@@ -35,6 +35,12 @@ services:
       - key: CLOUD_API_URL
         sync: false
         value: https://openrouter.ai/api/v1/chat/completions
+      - key: GROQ_API_KEY
+        sync: false
+        comment: "Groq Cloud API Key for ultra-fast generation"
+      - key: DEEPSEEK_API_KEY
+        sync: false
+        comment: "DeepSeek API Key for reasoning & code"
       - key: OLLAMA_URL
         sync: false
         comment: "Leave empty on Render — Ollama requires a custom/bare-metal host"
