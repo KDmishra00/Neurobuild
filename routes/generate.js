@@ -774,4 +774,95 @@ router.post('/analyze-and-generate', generateLimiter, auth, async (req, res) => 
   }
 });
 
+// ═══════════════════════════════════════════
+// AGENTIC AI — AUTONOMOUS OPTIMIZATION (Module 6)
+// ═══════════════════════════════════════════
+const agentOrchestrator = require('../services/agent');
+
+// Non-streaming agentic optimization
+router.post('/agent/optimize', generateLimiter, auth, async (req, res) => {
+  try {
+    const { html, model } = req.body;
+
+    if (!html || html.length < 50) {
+      return res.status(400).json({ error: 'Valid HTML is required for optimization' });
+    }
+
+    let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
+    if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
+      modelToUse = LOCAL_FALLBACK_MODEL;
+    }
+
+    console.log(`[Agent] Starting optimization with model: ${modelToUse}`);
+
+    const result = await agentOrchestrator.optimize(html, modelToUse);
+
+    // Increment user's generation count
+    if (req.user) {
+      await User.findByIdAndUpdate(req.user._id, { $inc: { generationCount: 1 } });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('[Agent] Optimization error:', err);
+    res.status(500).json({ error: 'Agentic optimization failed: ' + err.message });
+  }
+});
+
+// SSE streaming agentic optimization — real-time progress events
+const handleStreamOptimize = async (req, res) => {
+  const html = req.body?.html || req.query?.html;
+  const model = req.body?.model || req.query?.model;
+
+  if (!html || String(html).length < 50) {
+    return res.status(400).json({ error: 'Valid HTML is required for optimization' });
+  }
+
+  let modelToUse = model || (req.user?.settings?.model?.includes('/') ? req.user.settings.model : LOCAL_FALLBACK_MODEL) || LOCAL_FALLBACK_MODEL;
+  if (aiService.isExternalCloudModel(modelToUse) && !hasValidApiKey(modelToUse)) {
+    modelToUse = LOCAL_FALLBACK_MODEL;
+  }
+
+  // SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
+  const send = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  let aborted = false;
+  req.on('close', () => { aborted = true; });
+
+  try {
+    console.log(`[Agent/SSE] Starting streaming optimization with model: ${modelToUse}`);
+
+    const result = await agentOrchestrator.optimize(String(html), modelToUse, (event) => {
+      if (!aborted) send(event);
+    });
+
+    if (!aborted) {
+      send({ type: 'result', ...result });
+      // Increment user's generation count
+      if (req.user) {
+        User.findByIdAndUpdate(req.user._id, { $inc: { generationCount: 1 } }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('[Agent/SSE] Error:', err);
+    if (!aborted) {
+      send({ type: 'error', message: err.message });
+    }
+  } finally {
+    if (!aborted) res.end();
+  }
+};
+
+router.post('/agent/stream-optimize', generateLimiter, auth, handleStreamOptimize);
+router.get('/agent/stream-optimize', generateLimiter, auth, handleStreamOptimize);
+
 module.exports = router;

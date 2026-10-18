@@ -297,6 +297,56 @@ class ApiClient {
     const response = await this.client.get('/analytics/dashboard')
     return response.data
   }
+
+  // Agentic AI Optimization (Module 6)
+  async agentOptimize(html: string, model?: string): Promise<AgentResult> {
+    await this.fetchCsrfToken()
+    const response = await this.client.post('/agent/optimize', { html, model })
+    return response.data as AgentResult
+  }
+
+  async streamAgentOptimize(html: string, model?: string, onEvent?: (event: AgentEvent) => void): Promise<void> {
+    const token = localStorage.getItem('token')
+    await this.fetchCsrfToken()
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (this.csrfToken) headers['X-CSRF-Token'] = this.csrfToken
+
+    const response = await fetch(`${API_URL}/agent/stream-optimize`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ html, model }),
+    })
+
+    if (!response.ok || !response.body) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.error || 'Agent stream could not start')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split(/\r?\n\r?\n/)
+      buffer = events.pop() || ''
+      for (const event of events) {
+        const payload = event
+          .split(/\r?\n/)
+          .filter((line: string) => line.startsWith('data:'))
+          .map((line: string) => line.slice(5).trimStart())
+          .join('\n')
+        if (!payload) continue
+        try {
+          onEvent?.(JSON.parse(payload) as AgentEvent)
+        } catch {}
+      }
+    }
+  }
 }
 
 export const api = new ApiClient()

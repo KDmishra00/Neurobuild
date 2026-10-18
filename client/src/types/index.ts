@@ -73,3 +73,72 @@ export type AnalyzeResponse = {
   site: any
   filesProcessed: number
 }
+
+// Agentic AI Types (Module 6)
+export type AgentScores = {
+  design: number
+  accessibility: number
+  performance: number
+  seo: number
+  responsive: number
+}
+
+export type AgentEvent = {
+  type: string
+  iteration?: number
+  maxIterations?: number
+  message?: string
+  plan?: {
+    currentScore: number
+    actionCount: number
+    summary: string
+    actions?: Array<{
+      id: number
+      category: string
+      priority: string
+      title: string
+      instruction: string
+    }>
+  }
+  evaluation?: {
+    scores: AgentScores
+    overall: number
+    passed: boolean
+    verdict: string
+    remainingIssues?: string[]
+  }
+  htmlLength?: number
+  finalScore?: {
+    scores: AgentScores
+    overall: number
+    passed: boolean
+    verdict: string
+  }
+  // Result fields (sent with type='result')
+  finalHtml?: string
+  iterations?: number
+  history?: Array<{
+    iteration: number
+    plan: { currentScore: number; actionCount: number; summary: string }
+    evaluation: { scores: AgentScores; overall: number; passed: boolean; verdict: string }
+  }>
+  improved?: boolean
+}
+
+export type AgentResult = {
+  finalHtml: string
+  iterations: number
+  finalScore: {
+    scores: AgentScores
+    overall: number
+    passed: boolean
+    verdict: string
+    remainingIssues?: string[]
+  }
+  history: Array<{
+    iteration: number
+    plan: { currentScore: number; actionCount: number; summary: string }
+    evaluation: { scores: AgentScores; overall: number; passed: boolean; verdict: string }
+  }>
+  improved: boolean
+}

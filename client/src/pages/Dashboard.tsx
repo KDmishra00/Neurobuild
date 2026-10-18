@@ -6,8 +6,9 @@ import { api } from '../lib/api'
 import { Button, Badge } from '../components/ui'
 import {
   Paperclip, Image as ImageIcon, FileText, Zap, Loader, Download, ExternalLink, Save, X,
-  Monitor,
+  Monitor, Sparkles,
 } from 'lucide-react'
+import AgentOptimizerModal from '../components/AgentOptimizerModal'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import type { Model, FileAttachment } from '../types'
 import { cn } from '../lib/utils'
@@ -122,6 +123,7 @@ export default function Dashboard() {
   const [html, setHtml] = useState('')
   const [site, setSite] = useState<any>(null)
   const [saved, setSaved] = useState(false)
+  const [agentModalOpen, setAgentModalOpen] = useState(false)
 
   const [activeTab, setActiveTab] = useState<CodeTab>('html')
   const [promptWidth, setPromptWidth] = useState<number>(() => {
@@ -536,6 +538,14 @@ const DEEPSEEK_MODELS: Model[] = [
                 <div className="flex items-center gap-2">
                   <Badge className="bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 text-xs">Generated</Badge>
                   <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setAgentModalOpen(true)}
+                      className="bg-gradient-to-r from-amber-500 to-[#f4976c] hover:from-amber-600 hover:to-[#f38a5b] text-zinc-950 font-bold border-0 shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Agentic AI
+                    </Button>
                     <Button variant="secondary" size="sm" onClick={saveProject} disabled={saved}>
                       <Save className="w-3.5 h-3.5" /> {saved ? 'Saved' : 'Save'}
                     </Button>
@@ -660,6 +670,18 @@ const DEEPSEEK_MODELS: Model[] = [
           </pre>
         </div>
       </div>
+
+      <AgentOptimizerModal
+        isOpen={agentModalOpen}
+        onClose={() => setAgentModalOpen(false)}
+        currentHtml={html}
+        currentModel={model}
+        onApply={(improvedHtml) => {
+          setHtml(improvedHtml)
+          setSaved(false)
+          showToast('Website upgraded via Autonomous Agent loop!', 'success')
+        }}
+      />
     </div>
   )
 }
