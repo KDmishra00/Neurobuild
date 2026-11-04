@@ -30,6 +30,8 @@ COPY middleware ./middleware
 COPY models ./models
 COPY routes ./routes
 COPY services ./services
+COPY agents ./agents
+COPY public ./public
 
 # Copy the compiled React client
 COPY --from=client-builder /build/client/dist ./client/dist

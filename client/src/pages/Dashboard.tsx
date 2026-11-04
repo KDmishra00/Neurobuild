@@ -9,6 +9,7 @@ import {
   Monitor, Sparkles,
 } from 'lucide-react'
 import AgentOptimizerModal from '../components/AgentOptimizerModal'
+import CollabAgentModal from '../components/CollabAgentModal'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import type { Model, FileAttachment } from '../types'
 import { cn } from '../lib/utils'
@@ -124,6 +125,7 @@ export default function Dashboard() {
   const [site, setSite] = useState<any>(null)
   const [saved, setSaved] = useState(false)
   const [agentModalOpen, setAgentModalOpen] = useState(false)
+  const [collabModalOpen, setCollabModalOpen] = useState(false)
 
   const [activeTab, setActiveTab] = useState<CodeTab>('html')
   const [promptWidth, setPromptWidth] = useState<number>(() => {
@@ -541,10 +543,18 @@ const DEEPSEEK_MODELS: Model[] = [
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => setAgentModalOpen(true)}
-                      className="bg-gradient-to-r from-amber-500 to-[#f4976c] hover:from-amber-600 hover:to-[#f38a5b] text-zinc-950 font-bold border-0 shadow-sm"
+                      onClick={() => setCollabModalOpen(true)}
+                      className="bg-gradient-to-r from-amber-500 via-[#f4976c] to-indigo-600 hover:opacity-95 text-zinc-950 font-bold border-0 shadow-md"
                     >
-                      <Sparkles className="w-3.5 h-3.5" /> Agentic AI
+                      <Sparkles className="w-3.5 h-3.5 fill-zinc-950 text-zinc-950" /> Enhance with Agentic AI
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setAgentModalOpen(true)}
+                      className="text-xs"
+                    >
+                      UI Optimizer
                     </Button>
                     <Button variant="secondary" size="sm" onClick={saveProject} disabled={saved}>
                       <Save className="w-3.5 h-3.5" /> {saved ? 'Saved' : 'Save'}
@@ -680,6 +690,19 @@ const DEEPSEEK_MODELS: Model[] = [
           setHtml(improvedHtml)
           setSaved(false)
           showToast('Website upgraded via Autonomous Agent loop!', 'success')
+        }}
+      />
+
+      <CollabAgentModal
+        isOpen={collabModalOpen}
+        onClose={() => setCollabModalOpen(false)}
+        currentHtml={html}
+        currentPrompt={prompt}
+        currentModel={model}
+        onApply={(enhancedHtml) => {
+          setHtml(enhancedHtml)
+          setSaved(false)
+          showToast('Website enhanced with collaborative Backend & Database!', 'success')
         }}
       />
     </div>

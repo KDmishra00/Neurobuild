@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import type { AgentEvent, AgentScores, AgentResult } from '../types'
 import { Button } from './ui'

@@ -142,3 +142,63 @@ export type AgentResult = {
   }>
   improved: boolean
 }
+
+// Module 6: Collaborative Agentic AI Types
+export type CollabTask = {
+  id: string
+  agentName: 'planner' | 'database' | 'backend' | 'frontend' | 'reviewer' | string
+  description: string
+  status: 'pending' | 'running' | 'done' | 'failed'
+  result?: string | null
+}
+
+export type CollabMessage = {
+  id?: number
+  timestamp?: string
+  from: string
+  to: string
+  topic: string
+  payload?: any
+  message?: string
+}
+
+export type CollabAgentEvent = {
+  type: string
+  runId?: string
+  message?: string
+  phase?: string
+  agent?: string
+  from?: string
+  to?: string
+  topic?: string
+  result?: any
+  issues?: any[]
+  revisionNumber?: number
+  maxRevisions?: number
+  remainingIssues?: any[]
+  reviewPassed?: boolean
+  taskSummary?: CollabTask[]
+  messageLog?: CollabMessage[]
+  enhancedHtml?: string
+  success?: boolean
+  error?: string
+  schema?: any
+  apiContract?: any
+  backendCode?: string
+  schemaCode?: string
+  seedData?: any
+}
+
+export type CollabAgentRunSummary = {
+  id: string
+  prompt: string
+  domain: string
+  domainType: string
+  needsBackend: boolean
+  status: 'running' | 'complete' | 'failed'
+  reviewPassed: boolean
+  taskCount: number
+  completedTasks: number
+  createdAt: string
+  durationMs: number
+}

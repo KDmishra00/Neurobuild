@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
-import type { User, Project, Conversation, Model, FileAttachment, GenerateResponse, AnalyzeResponse, AgentEvent, AgentResult } from '../types'
+import type { User, Project, Conversation, Model, FileAttachment, GenerateResponse, AnalyzeResponse, AgentEvent, AgentResult, CollabAgentEvent, CollabAgentRunSummary } from '../types'
 
 // When deployed to GitHub Pages (static), point API calls to the Vercel backend.
 // Set VITE_API_URL in the GitHub Actions workflow or .env file.
@@ -346,6 +346,63 @@ class ApiClient {
         } catch {}
       }
     }
+  }
+
+  // Collaborative Multi-Agent System (Module 6)
+  async streamCollabEnhance(
+    data: { html: string; prompt?: string; model?: string; projectId?: string },
+    onEvent?: (event: CollabAgentEvent) => void
+  ): Promise<void> {
+    const token = localStorage.getItem('token')
+    await this.fetchCsrfToken()
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (this.csrfToken) headers['X-CSRF-Token'] = this.csrfToken
+
+    const response = await fetch(`${API_URL}/agent/collab/enhance`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok || !response.body) {
+      const errData = await response.json().catch(() => ({}))
+      throw new Error(errData.error || 'Collaborative agent stream failed to start')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split(/\r?\n\r?\n/)
+      buffer = events.pop() || ''
+      for (const event of events) {
+        const payload = event
+          .split(/\r?\n/)
+          .filter((line: string) => line.startsWith('data:'))
+          .map((line: string) => line.slice(5).trimStart())
+          .join('\n')
+        if (!payload) continue
+        try {
+          onEvent?.(JSON.parse(payload) as CollabAgentEvent)
+        } catch {}
+      }
+    }
+  }
+
+  async getCollabRuns(page = 1, limit = 20) {
+    const response = await this.client.get(`/agent/collab/runs?page=${page}&limit=${limit}`)
+    return response.data as { runs: CollabAgentRunSummary[]; pagination: any }
+  }
+
+  async getCollabRun(runId: string) {
+    const response = await this.client.get(`/agent/collab/runs/${runId}`)
+    return response.data as { run: any }
   }
 }
 

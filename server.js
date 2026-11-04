@@ -110,6 +110,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/generate'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/agent/collab', require('./routes/agentCollab'));
 
 // Health check
 app.get('/api/health', (req, res) => {
