@@ -149,11 +149,17 @@ router.post('/generate', generateLimiter, auth, validateGenerate, async (req, re
     // Store the validated structured object in cache. Older cache entries that
     // only contain raw HTML are converted once and kept compatible.
     let site = aiService.getCached(prompt, modelToUse);
+    if (site && aiService.isRefusalOrNonHtml(typeof site === 'object' ? (site.document || site.html) : site)) {
+      site = null;
+    }
     const fromCache = !!site;
     let fallback = false;
     if (!site) {
       try {
         site = await aiService.generateSite(prompt, modelToUse);
+        if (site && site.fallback) {
+          fallback = true;
+        }
       } catch (err) {
         console.warn(`Generation failed with ${modelToUse} (${err.message}); attempting fallback`);
         fallback = true;

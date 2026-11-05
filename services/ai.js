@@ -92,6 +92,14 @@ Requirements:
 - Do NOT output JSON — output ONLY raw HTML starting with <!DOCTYPE html>
 - Just raw, complete HTML
 
+FRAMEWORK & STACK REQUESTS:
+- If the user asks for React, Vite, Tailwind CSS, Lucide icons, Recharts, Chart.js, or similar frameworks/libraries:
+  - Deliver the complete, functional web app as a self-contained single HTML document starting with <!DOCTYPE html>.
+  - Emulate Tailwind styling with clean CSS variables and classes in <style>.
+  - Implement Lucide/React icons as clean inline SVG elements.
+  - Implement charts and visualizations (like Recharts) using HTML5 Canvas, SVG, or embedded JavaScript chart rendering.
+  - NEVER refuse a request because of a requested framework or stack — always deliver the requested features and visual experience.
+
 CRITICAL FOR INTERACTIVE APPS (calculators, tools, games):
 - Use proper JavaScript event listeners (addEventListener or onclick attributes)
 - Never use eval() for calculations — write explicit arithmetic functions
@@ -142,6 +150,14 @@ CRITICAL REQUIREMENTS:
 - Do NOT wrap in markdown code blocks
 - Do NOT output JSON — output ONLY raw HTML starting with <!DOCTYPE html>
 - Make the design feel premium and polished
+
+FRAMEWORK & STACK REQUESTS:
+- If the user asks for React, Vite, Tailwind CSS, Lucide icons, Recharts, Chart.js, or similar frameworks/libraries:
+  - Deliver the complete, functional web app as a self-contained single HTML document starting with <!DOCTYPE html>.
+  - Emulate Tailwind styling with clean CSS variables and classes in <style>.
+  - Implement Lucide/React icons as clean inline SVG elements.
+  - Implement charts and visualizations (like Recharts) using HTML5 Canvas, SVG, or embedded JavaScript chart rendering.
+  - NEVER refuse a request because of a requested framework or stack — always deliver the requested features and visual experience.
 
 CRITICAL FOR INTERACTIVE APPS (calculators, tools, converters, games):
 - Write complete, working JavaScript with proper event handling
@@ -315,6 +331,38 @@ Output ONLY valid JSON (no markdown, no explanation) with this structure:
 }`;
 
 class AIService {
+  /**
+   * Detect whether an AI response is an apology/refusal message or lacks real HTML/JSON content.
+   */
+  isRefusalOrNonHtml(text) {
+    if (!text || typeof text !== 'string') return true;
+    const trimmed = text
+      .replace(/^```(?:html|json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
+    if (!trimmed) return true;
+
+    // Direct refusal / apology patterns commonly returned by aligned LLMs
+    const refusalRegex = /\b(i(?:'m| am) sorry|i apologize|can(?:'t|not) fulfill|unable to fulfill|cannot assist|cannot generate|cannot create|against my (?:safety|content) policy|as an ai (?:language )?model|i am unable to)\b/i;
+
+    if (refusalRegex.test(trimmed)) {
+      // If it contains a refusal, only consider valid if it also has substantial HTML markup (>400 chars)
+      const hasSubstantialHtml = (/<body\b[\s\S]*<\/body>/i.test(trimmed) || (trimmed.includes('<!DOCTYPE') && trimmed.includes('<div'))) && trimmed.length > 400;
+      if (!hasSubstantialHtml) {
+        return true;
+      }
+    }
+
+    // Check if there are any HTML tags or valid JSON in the output
+    const hasAnyHtmlTag = /<[a-z][\s\S]*>/i.test(trimmed);
+    const isJson = (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+    if (!hasAnyHtmlTag && !isJson) {
+      return true;
+    }
+
+    return false;
+  }
+
   /** Normalize user input before it is incorporated into an AI instruction. */
   normalizePrompt(prompt) {
     return String(prompt || '')
@@ -333,7 +381,8 @@ class AIService {
       `Website request: ${normalized}`,
       'Create a polished, mobile-first single-page website.',
       'Include a clear heading, useful content sections, one primary action, and a footer.',
-      'Use only self-contained HTML, CSS, and vanilla JavaScript.'
+      'Use only self-contained HTML, CSS, and vanilla JavaScript.',
+      'If modern frameworks or libraries (e.g. React, Vite, Tailwind, Lucide, Recharts) are mentioned, implement the requested features, icons, and charts cleanly in self-contained HTML/CSS/JS without refusing.'
     ].join('\n');
   }
 
@@ -342,12 +391,17 @@ class AIService {
    * compatible with local models that do not reliably return JSON.
    */
   async generateSite(prompt, model = DEFAULT_MODEL) {
+    this._lastFallback = false;
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: prompt }
     ];
     const output = await this._complete(messages, model);
-    return this.normalizeGeneratedSite(output);
+    const site = this.normalizeGeneratedSite(output);
+    if (this._lastFallback) {
+      site.fallback = true;
+    }
+    return site;
   }
 
   /**
@@ -441,12 +495,13 @@ class AIService {
   /** Complete a non-streaming request with either configured provider. */
   async _complete(messages, model) {
     if (this.isExternalCloudModel(model)) {
-      const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
+      const { apiUrl, modelName, headers, isAstra, isGroq, isDeepSeek, hasCustomAstra } = this._resolveCloudConfig(model);
 
       if (isGroq) {
         const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
         const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
+        const content = data.choices?.[0]?.message?.content || '';
+        return content;
       }
 
       if (isAstra) {
@@ -459,17 +514,39 @@ class AIService {
             });
             if (response.ok) {
               const data = await response.json();
-              return data.choices?.[0]?.message?.content || '';
+              const content = data.choices?.[0]?.message?.content || '';
+              if (!this.isRefusalOrNonHtml(content)) {
+                return content;
+              }
+              console.warn(`[Astra] Model returned refusal; falling back to Groq`);
+              this._lastFallback = true;
+            } else {
+              console.warn(`[Astra] Gateway returned status ${response.status}; falling back to Groq`);
+              this._lastFallback = true;
             }
-            console.warn(`[Astra] Gateway returned status ${response.status}; falling back to Groq`);
           } catch (err) {
             console.warn(`[Astra] Gateway request failed (${err.message}); falling back to Groq`);
+            this._lastFallback = true;
           }
         }
         // Direct route or fallback to Groq with flagship 120B model
+        this._lastFallback = true;
         const { response } = await this._fetchGroqChat(messages, { model: 'openai/gpt-oss-120b', stream: false });
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
+      }
+
+      // Optimize max_tokens: DeepSeek Reasoner covers both reasoning and completion tokens
+      const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+      let requestMessages = messages;
+      if (isDeepSeek && modelName === 'deepseek-reasoner') {
+        // DeepSeek Reasoner does best when system constraints don't silence reasoning
+        requestMessages = [
+          {
+            role: 'user',
+            content: `${messages.map(m => m.content).join('\n\n')}\n\nIMPORTANT: Output the complete, self-contained HTML website starting with <!DOCTYPE html>. If the request mentions React, Vite, Tailwind, Recharts or Lucide, render them directly using embedded CSS, inline SVG icons, and JavaScript/Canvas charts. Do not refuse.`
+          }
+        ];
       }
 
       let response = await fetch(apiUrl, {
@@ -477,20 +554,31 @@ class AIService {
         headers,
         body: JSON.stringify({
           model: modelName,
-          max_tokens: 4096,
-          messages
+          max_tokens: maxTokens,
+          messages: requestMessages
         })
       });
 
       if (!response.ok) {
         console.warn(`[Cloud] ${modelName} returned ${response.status}; falling back to Groq`);
+        this._lastFallback = true;
         const { response: fallbackRes } = await this._fetchGroqChat(messages, { stream: false });
         const data = await fallbackRes.json();
         return data.choices?.[0]?.message?.content || '';
       }
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
+      const content = data.choices?.[0]?.message?.content || '';
+
+      if (this.isRefusalOrNonHtml(content)) {
+        console.warn(`[Cloud] ${modelName} returned refusal or non-HTML ("${content.slice(0, 80)}..."); falling back to Groq LPU`);
+        this._lastFallback = true;
+        const { response: fallbackRes } = await this._fetchGroqChat(messages, { stream: false });
+        const fallbackData = await fallbackRes.json();
+        return fallbackData.choices?.[0]?.message?.content || '';
+      }
+
+      return content;
     }
 
     let response;
@@ -876,7 +964,7 @@ class AIService {
 
   // Generate using cloud API (OpenAI-compatible format)
   async generateCloud(prompt, model) {
-    const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
+    const { apiUrl, modelName, headers, isAstra, isGroq, isDeepSeek, hasCustomAstra } = this._resolveCloudConfig(model);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Create a website: ${prompt}` }
@@ -900,9 +988,13 @@ class AIService {
           if (response.ok) {
             const data = await response.json();
             let html = data.choices?.[0]?.message?.content || '';
-            return this.cleanHtml(html);
+            if (!this.isRefusalOrNonHtml(html)) {
+              return this.cleanHtml(html);
+            }
+            console.warn(`[Cloud] Astra model returned refusal; seamlessly routing to Groq`);
+          } else {
+            console.warn(`[Cloud] Astra gateway returned status ${response.status}; seamlessly routing to Groq`);
           }
-          console.warn(`[Cloud] Astra gateway returned status ${response.status}; seamlessly routing to Groq`);
         } catch (err) {
           console.warn(`[Cloud] Astra gateway failed (${err.message}); seamlessly routing to Groq`);
         }
@@ -913,13 +1005,24 @@ class AIService {
       return this.cleanHtml(html);
     }
 
+    const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+    let requestMessages = messages;
+    if (isDeepSeek && modelName === 'deepseek-reasoner') {
+      requestMessages = [
+        {
+          role: 'user',
+          content: `${messages.map(m => m.content).join('\n\n')}\n\nIMPORTANT: Output the complete, self-contained HTML website starting with <!DOCTYPE html>. If the request mentions React, Vite, Tailwind, Recharts or Lucide, render them directly using embedded CSS, inline SVG icons, and JavaScript/Canvas charts. Do not refuse.`
+        }
+      ];
+    }
+
     let response = await fetch(apiUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: modelName,
-        max_tokens: 4096,
-        messages
+        max_tokens: maxTokens,
+        messages: requestMessages
       })
     });
 
@@ -933,12 +1036,18 @@ class AIService {
 
     const data = await response.json();
     let html = data.choices?.[0]?.message?.content || '';
+    if (this.isRefusalOrNonHtml(html)) {
+      console.warn(`[Cloud] ${modelName} returned refusal; falling back to Groq`);
+      const { response: fallbackRes } = await this._fetchGroqChat(messages, { stream: false });
+      const fallbackData = await fallbackRes.json();
+      html = fallbackData.choices?.[0]?.message?.content || '';
+    }
     return this.cleanHtml(html);
   }
 
   // Stream generate using cloud API (OpenAI-compatible SSE format)
   async *streamCloud(prompt, model, onChunk) {
-    const { apiUrl, modelName, headers, isAstra, isGroq, hasCustomAstra } = this._resolveCloudConfig(model);
+    const { apiUrl, modelName, headers, isAstra, isGroq, isDeepSeek, hasCustomAstra } = this._resolveCloudConfig(model);
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Create a website: ${prompt}` }
@@ -977,14 +1086,24 @@ class AIService {
         response = result.response;
       }
     } else {
+      const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+      let requestMessages = messages;
+      if (isDeepSeek && modelName === 'deepseek-reasoner') {
+        requestMessages = [
+          {
+            role: 'user',
+            content: `${messages.map(m => m.content).join('\n\n')}\n\nIMPORTANT: Output the complete, self-contained HTML website starting with <!DOCTYPE html>. If the request mentions React, Vite, Tailwind, Recharts or Lucide, render them directly using embedded CSS, inline SVG icons, and JavaScript/Canvas charts. Do not refuse.`
+          }
+        ];
+      }
       response = await fetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           model: modelName,
           stream: true,
-          max_tokens: 4096,
-          messages
+          max_tokens: maxTokens,
+          messages: requestMessages
         })
       });
 
@@ -1372,6 +1491,9 @@ class AIService {
   normalizeGeneratedSite(output) {
     const raw = String(output || '').trim();
     if (!raw) throw new Error('The AI returned an empty website');
+    if (this.isRefusalOrNonHtml(raw)) {
+      throw new Error(`The AI model refused the request or returned an invalid non-HTML response: "${raw.slice(0, 100)}"`);
+    }
 
     const parsed = this._extractJson(raw);
     const hasStructuredFields = !parsed.error && parsed &&
@@ -1754,6 +1876,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   cleanHtml(html) {
+    if (this.isRefusalOrNonHtml(html)) {
+      throw new Error(`The AI response is a refusal or does not contain valid HTML: "${String(html).slice(0, 100)}"`);
+    }
+
     // Clean up markdown code fences if present
     html = html
       .replace(/^```html\n?/i, '')
@@ -1822,6 +1948,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   setCached(prompt, model, html) {
+    if (!html) return;
+    const content = typeof html === 'object' ? (html.document || html.html || '') : String(html);
+    if (this.isRefusalOrNonHtml(content)) return;
+
     const key = this.getCacheKey(prompt, model);
     this.cache.set(key, { html, time: Date.now() });
 

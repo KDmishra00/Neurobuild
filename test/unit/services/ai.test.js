@@ -58,6 +58,13 @@ describe('AIService — Utilities', () => {
         .toThrow('did not contain any page content');
     });
 
+    test('rejects model refusal and non-HTML messages', () => {
+      expect(() => aiService.normalizeGeneratedSite("I'm sorry, but I can't fulfill that request."))
+        .toThrow('refused the request');
+      expect(() => aiService.normalizeGeneratedSite("I apologize, but I cannot fulfill this request."))
+        .toThrow('refused the request');
+    });
+
     test('re-adds calculator button handlers with valid HTML quoting', () => {
       const result = aiService.normalizeGeneratedSite(JSON.stringify({
         title: 'Calculator',
@@ -110,6 +117,11 @@ describe('AIService — Utilities', () => {
       const count = (result.match(/<!doctype/gi) || []).length;
       expect(count).toBe(1);
     });
+
+    test('should throw an error on refusal or non-HTML input', () => {
+      expect(() => aiService.cleanHtml("I'm sorry, but I can't fulfill that request."))
+        .toThrow('refusal');
+    });
   });
 
   describe('cache', () => {
@@ -117,6 +129,12 @@ describe('AIService — Utilities', () => {
       aiService.setCached('test prompt', 'model-a', '<html>cached</html>');
       const cached = aiService.getCached('test prompt', 'model-a');
       expect(cached).toBe('<html>cached</html>');
+    });
+
+    test('should not cache refusal strings', () => {
+      aiService.setCached('bad prompt', 'model-refusal', "I'm sorry, but I can't fulfill that request.");
+      const cached = aiService.getCached('bad prompt', 'model-refusal');
+      expect(cached).toBeNull();
     });
 
     test('should return null for non-existent cache', () => {
