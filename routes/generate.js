@@ -410,7 +410,11 @@ router.post('/edit-site', generateLimiter, auth, async (req, res) => {
     res.json({ html: editedHtml });
   } catch (err) {
     console.error('Edit site error:', err);
-    res.status(500).json({ error: err.message || 'Failed to edit site' });
+    const message = err.message || 'Failed to edit site';
+    const friendlyMessage = message.includes('413')
+      ? 'The website is too large for the selected model. Try selecting DeepSeek V3 Chat in the model dropdown to edit large websites.'
+      : message;
+    res.status(500).json({ error: friendlyMessage });
   }
 });
 

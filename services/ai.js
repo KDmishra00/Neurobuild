@@ -433,24 +433,27 @@ class AIService {
       'openai/gpt-oss-20b'
     ].filter((m, i, arr) => arr.indexOf(m) === i && VALID_GROQ_MODELS.has(m));
 
-    // Calculate safe max_tokens.  Groq's free-tier rate limit is ~6000 TPM,
-    // but individual requests can use up to 65536 completion tokens.  We set a
-    // generous default (8192) so website generation isn't truncated.  If TPM is
-    // exceeded, the failover loop already retries with smaller candidate models.
+    // Calculate safe max_tokens. Groq's on-demand free tier rate limit is ~6,000 TPM
+    // (Tokens Per Minute per request). Total request tokens = input_tokens + max_tokens
+    // must not exceed ~5,800 to avoid HTTP 413.
     const callerMaxTokens = options.max_tokens;
     const totalChars = (messages || []).reduce((acc, m) => acc + (String(m.content || '').length), 0);
     const estimatedInputTokens = Math.ceil(totalChars / 3.5);
-    const maxTokens = callerMaxTokens || Math.max(2048, Math.min(8192, 32000 - estimatedInputTokens));
+    const groqTpmBudget = 5800;
+    const remainingForCompletion = Math.max(768, groqTpmBudget - estimatedInputTokens);
+    let currentMaxTokens = callerMaxTokens
+      ? Math.min(callerMaxTokens, remainingForCompletion)
+      : Math.min(4096, remainingForCompletion);
 
     const apiKey = getGroqKey();
     let lastError = null;
 
     for (const model of candidateModels) {
-      console.log(`[Groq] Calling ${model} (max_tokens: ${maxTokens}, stream: ${isStream})`);
+      console.log(`[Groq] Calling ${model} (max_tokens: ${currentMaxTokens}, stream: ${isStream})`);
       const body = {
         model,
         messages,
-        max_tokens: maxTokens
+        max_tokens: currentMaxTokens
       };
       if (isStream) body.stream = true;
 
@@ -474,6 +477,9 @@ class AIService {
           const detail = await response.text().catch(() => '');
           console.warn(`[Groq] ${model} returned ${response.status}; failing over to next model. Detail: ${detail.slice(0, 100)}`);
           lastError = new Error(`Groq ${model} (${response.status}): ${detail.slice(0, 150)}`);
+          if (response.status === 413) {
+            currentMaxTokens = Math.max(512, Math.floor(currentMaxTokens * 0.6));
+          }
           continue;
         }
 
@@ -483,6 +489,9 @@ class AIService {
       } catch (err) {
         if (err.message.includes('413') || err.message.includes('429') || err.message.includes('404') || err.message.includes('400')) {
           lastError = err;
+          if (err.message.includes('413')) {
+            currentMaxTokens = Math.max(512, Math.floor(currentMaxTokens * 0.6));
+          }
           continue;
         }
         throw err;
@@ -498,10 +507,19 @@ class AIService {
       const { apiUrl, modelName, headers, isAstra, isGroq, isDeepSeek, hasCustomAstra } = this._resolveCloudConfig(model);
 
       if (isGroq) {
-        const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        return content;
+        try {
+          const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content || '';
+          return content;
+        } catch (groqErr) {
+          if (process.env.DEEPSEEK_API_KEY) {
+            console.warn(`[Groq] All Groq models failed (${groqErr.message}); falling back to DeepSeek Chat`);
+            this._lastFallback = true;
+            return await this._complete(messages, 'deepseek/deepseek-chat');
+          }
+          throw groqErr;
+        }
       }
 
       if (isAstra) {
@@ -623,16 +641,47 @@ class AIService {
   }
 
   /**
+   * Compact HTML before passing into prompts (e.g. editWebsite, runRefiner).
+   * Strips bloated inline data URIs and excessive whitespace so the prompt fits
+   * easily within strict per-request token budgets (e.g. Groq 6,000 TPM limit).
+   */
+  _compactHtmlForPrompt(html) {
+    if (!html || typeof html !== 'string') return '';
+    return html
+      // Replace inline SVG data URIs with short placeholder URLs
+      .replace(/data:image\/svg\+xml;utf8,[^"'\s)]+/gi, 'https://placehold.co/800x600/png')
+      .replace(/data:image\/[^;]+;base64,[^"'\s)]+/gi, 'https://placehold.co/800x600/png')
+      // Collapse whitespace
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .trim();
+  }
+
+  /**
    * Apply a user's edit request to an existing generated site.
    * Routes through _complete so any model (local, Groq, NVIDIA NIM, cloud) works.
    */
   async editWebsite(rawHtml, instruction, model = null) {
     const targetModel = model || process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud';
     console.log(`[Edit] Applying "${String(instruction).slice(0, 80)}" with ${targetModel}...`);
-    const output = await this._complete([
+
+    const compactHtml = this._compactHtmlForPrompt(rawHtml);
+    const messages = [
       { role: 'system', content: EDIT_PROMPT },
-      { role: 'user', content: `EDIT REQUEST:\n${instruction}\n\nCURRENT WEBSITE CODE:\n${rawHtml}` }
-    ], targetModel);
+      { role: 'user', content: `EDIT REQUEST:\n${instruction}\n\nCURRENT WEBSITE CODE:\n${compactHtml}` }
+    ];
+
+    let output;
+    try {
+      output = await this._complete(messages, targetModel);
+    } catch (err) {
+      if (process.env.DEEPSEEK_API_KEY && !String(targetModel).includes('deepseek-chat')) {
+        console.warn(`[Edit] ${targetModel} failed (${err.message}); falling back to DeepSeek Chat`);
+        output = await this._complete(messages, 'deepseek/deepseek-chat');
+      } else {
+        throw err;
+      }
+    }
     const html = this.cleanHtml(output);
     console.log('[Edit] Complete. HTML length:', html.length);
     return html;
@@ -644,10 +693,24 @@ class AIService {
   async runRefiner(rawHtml, instruction = 'Improve and optimize this website code:', model = null) {
     const targetModel = model || process.env.PIPELINE_MODEL_REFINER || process.env.OLLAMA_MODEL || 'groq/openai/gpt-oss-120b:cloud';
     console.log(`[Pipeline] Stage 2: Refining code with ${targetModel}...`);
-    const output = await this._complete([
+
+    const compactHtml = this._compactHtmlForPrompt(rawHtml);
+    const messages = [
       { role: 'system', content: REFINER_PROMPT },
-      { role: 'user', content: `${instruction}\n\n${rawHtml}` }
-    ], targetModel);
+      { role: 'user', content: `${instruction}\n\n${compactHtml}` }
+    ];
+
+    let output;
+    try {
+      output = await this._complete(messages, targetModel);
+    } catch (err) {
+      if (process.env.DEEPSEEK_API_KEY && !String(targetModel).includes('deepseek-chat')) {
+        console.warn(`[Pipeline] Refiner ${targetModel} failed (${err.message}); falling back to DeepSeek Chat`);
+        output = await this._complete(messages, 'deepseek/deepseek-chat');
+      } else {
+        throw err;
+      }
+    }
     const html = this.cleanHtml(output);
     console.log('[Pipeline] Stage 2 complete. Final HTML length:', html.length);
     return html;

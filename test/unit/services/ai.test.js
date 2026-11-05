@@ -225,6 +225,25 @@ describe('AIService — Utilities', () => {
       expect(result.error).toBeDefined();
     });
   });
+
+  describe('_compactHtmlForPrompt', () => {
+    test('should replace giant inline SVG data URIs with short placeholders', () => {
+      const bigSvgData = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="%23123456"/></svg>';
+      const input = `<div><img src="${bigSvgData}" alt="pic" /></div>`;
+      const compacted = aiService._compactHtmlForPrompt(input);
+
+      expect(compacted).not.toContain('data:image/svg+xml');
+      expect(compacted).toContain('https://placehold.co/800x600/png');
+    });
+
+    test('should collapse excessive whitespace and blank lines', () => {
+      const input = `<div>\n\n\n\n   <p>Hello      World</p>\n\n\n</div>`;
+      const compacted = aiService._compactHtmlForPrompt(input);
+
+      expect(compacted).not.toContain('\n\n\n');
+      expect(compacted).toContain('<p>Hello World</p>');
+    });
+  });
 });
 
 // Custom matcher
