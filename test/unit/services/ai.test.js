@@ -143,6 +143,43 @@ describe('AIService — Utilities', () => {
         js: ''
       }))).toThrow('did not contain any page content');
     });
+
+    test('strips conversational preamble/summary around fenced or DOCTYPE HTML and condenses huge Groq prompts', () => {
+      const wrapped = 'Sure! Here is your app:\n```html\n<!DOCTYPE html><html><head><title>Lib</title></head><body><main>Library</main></body></html>\n```\n\nSummary of features:\n- Catalog';
+      const site = aiService.normalizeGeneratedSite(wrapped);
+      expect(site.html).toContain('<main>Library</main>');
+      expect(site.html).not.toContain('Summary of features');
+
+      const hugeUserText = 'A'.repeat(12000) + 'FINAL_REQUIREMENT';
+      const msgs = [
+        { role: 'system', content: 'SYS' },
+        { role: 'user', content: hugeUserText }
+      ];
+      const condensed = aiService._condenseMessagesForGroq(msgs, 11000);
+      expect(condensed[0].content).toBe('SYS');
+      expect(condensed[1].content.length).toBeLessThan(11000);
+      expect(condensed[1].content).toContain('FINAL_REQUIREMENT');
+    });
+  });
+
+  describe('generateSite failover', () => {
+    const origDeepSeek = process.env.DEEPSEEK_API_KEY;
+    afterEach(() => {
+      jest.restoreAllMocks();
+      process.env.DEEPSEEK_API_KEY = origDeepSeek;
+    });
+
+    test('fails over when the primary model returns bodyless/truncated output', async () => {
+      process.env.DEEPSEEK_API_KEY = 'sk-test-deepseek-key';
+      const completeSpy = jest.spyOn(aiService, '_complete')
+        .mockResolvedValueOnce('<!DOCTYPE html><html><head><title>Cut off</title><style>body{margin:0}')
+        .mockResolvedValueOnce('<!DOCTYPE html><html><head><title>Recovered</title></head><body><h1>Working Site</h1></body></html>');
+
+      const result = await aiService.generateSite('Build a Library Management System', 'groq/openai/gpt-oss-120b:cloud');
+      expect(completeSpy).toHaveBeenCalledTimes(2);
+      expect(result.fallback).toBe(true);
+      expect(result.html).toContain('<h1>Working Site</h1>');
+    });
   });
 
   describe('cleanHtml', () => {

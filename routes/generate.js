@@ -164,7 +164,11 @@ router.post('/generate', generateLimiter, auth, validateGenerate, async (req, re
         console.warn(`Generation failed with ${modelToUse} (${err.message}); attempting fallback`);
         fallback = true;
         try {
-          if (process.env.GROQ_API_KEY && modelToUse !== 'groq/openai/gpt-oss-120b:cloud') {
+          if (process.env.DEEPSEEK_API_KEY && !process.env.DEEPSEEK_API_KEY.includes('your_') && modelToUse !== 'deepseek/deepseek-chat') {
+            console.warn(`[Fallback] Switching to DeepSeek V3 Chat`);
+            modelToUse = 'deepseek/deepseek-chat';
+            site = await aiService.generateSite(prompt, modelToUse);
+          } else if (process.env.GROQ_API_KEY && modelToUse !== 'groq/openai/gpt-oss-120b:cloud') {
             console.warn(`[Fallback] Switching to Groq LPU (openai/gpt-oss-120b)`);
             modelToUse = 'groq/openai/gpt-oss-120b:cloud';
             site = await aiService.generateSite(prompt, modelToUse);

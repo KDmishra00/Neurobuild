@@ -91,6 +91,7 @@ Requirements:
 - Do NOT explain anything
 - Do NOT use markdown code blocks
 - Do NOT output JSON — output ONLY raw HTML starting with <!DOCTYPE html>
+- If the user asks for a summary, setup instructions, limitations, or demo credentials, embed them neatly inside a section/modal in the HTML page rather than writing plain markdown instead of HTML
 - Just raw, complete HTML
 
 FRAMEWORK & STACK REQUESTS:
@@ -387,21 +388,89 @@ class AIService {
   }
 
   /**
-   * Generate a structured site object. The raw HTML fallback keeps the app
-   * compatible with local models that do not reliably return JSON.
+   * Generate a structured site object. Automatically fails over across configured
+   * cloud providers if a model truncates before emitting page content or fails
+   * due to strict per-request token limits on huge prompts.
    */
   async generateSite(prompt, model = DEFAULT_MODEL) {
     this._lastFallback = false;
+    const promptText = String(prompt || '');
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: prompt }
+      { role: 'user', content: promptText }
     ];
-    const output = await this._complete(messages, model);
-    const site = this.normalizeGeneratedSite(output);
-    if (this._lastFallback) {
-      site.fallback = true;
+
+    // Huge prompts (> ~9k chars / ~2.5k tokens) exceed Groq's 5,800 TPM free-tier
+    // window before leaving enough output tokens for full HTML. Prefer DeepSeek
+    // when available so the entire specification fits without truncation.
+    const preferDeepSeekFirst =
+      (this.isGroqModel(model) || this.isAstraModel(model)) &&
+      promptText.length > 9000 &&
+      !!process.env.DEEPSEEK_API_KEY &&
+      !process.env.DEEPSEEK_API_KEY.includes('your_');
+
+    const candidates = [];
+    if (preferDeepSeekFirst) {
+      console.log(`[GenerateSite] Large prompt (${promptText.length} chars); routing from ${model} to deepseek/deepseek-chat`);
+      this._lastFallback = true;
+      candidates.push('deepseek/deepseek-chat');
+    } else {
+      candidates.push(model);
     }
-    return site;
+
+    if (process.env.DEEPSEEK_API_KEY && !process.env.DEEPSEEK_API_KEY.includes('your_')) {
+      if (!candidates.includes('deepseek/deepseek-chat')) {
+        candidates.push('deepseek/deepseek-chat');
+      }
+    }
+    if (getGroqKey() && !candidates.includes('groq/openai/gpt-oss-120b:cloud')) {
+      candidates.push('groq/openai/gpt-oss-120b:cloud');
+    }
+
+    let lastErr;
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (i > 0) {
+        this._lastFallback = true;
+        console.warn(`[GenerateSite] Retrying generation with fallback model ${candidate} after error: ${lastErr?.message}`);
+      }
+      try {
+        const output = await this._complete(messages, candidate);
+        const site = this.normalizeGeneratedSite(output);
+        if (this._lastFallback) {
+          site.fallback = true;
+        }
+        return site;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
+  }
+
+  /** Condense oversized user prompts when calling strict TPM-limited Groq models. */
+  _condenseMessagesForGroq(messages, maxTotalChars = 11000) {
+    const list = Array.isArray(messages) ? messages : [];
+    const total = list.reduce((sum, m) => sum + String(m.content || '').length, 0);
+    if (total <= maxTotalChars) return list;
+
+    const systemChars = list
+      .filter(m => m.role === 'system')
+      .reduce((sum, m) => sum + String(m.content || '').length, 0);
+    const availableForNonSystem = Math.max(2500, maxTotalChars - systemChars);
+
+    return list.map(m => {
+      if (m.role === 'system') return m;
+      const text = String(m.content || '');
+      if (text.length <= availableForNonSystem) return m;
+      const headLen = Math.floor(availableForNonSystem * 0.65);
+      const tailLen = Math.max(400, availableForNonSystem - headLen - 80);
+      return {
+        ...m,
+        content: `${text.slice(0, headLen)}\n\n...[middle specification condensed for token budget]...\n\n${text.slice(-tailLen)}`
+      };
+    });
   }
 
   /**
@@ -434,13 +503,14 @@ class AIService {
     ].filter((m, i, arr) => arr.indexOf(m) === i && VALID_GROQ_MODELS.has(m));
 
     // Calculate safe max_tokens. Groq's on-demand free tier rate limit is ~6,000 TPM
-    // (Tokens Per Minute per request). Total request tokens = input_tokens + max_tokens
-    // must not exceed ~5,800 to avoid HTTP 413.
+    // (Tokens Per Minute per request). Condense oversized prompts first so Groq always
+    // retains a healthy completion budget instead of starving max_tokens to < 1,000.
+    const safeMessages = this._condenseMessagesForGroq(messages, 11000);
     const callerMaxTokens = options.max_tokens;
-    const totalChars = (messages || []).reduce((acc, m) => acc + (String(m.content || '').length), 0);
+    const totalChars = safeMessages.reduce((acc, m) => acc + (String(m.content || '').length), 0);
     const estimatedInputTokens = Math.ceil(totalChars / 3.5);
     const groqTpmBudget = 5800;
-    const remainingForCompletion = Math.max(768, groqTpmBudget - estimatedInputTokens);
+    const remainingForCompletion = Math.max(1024, groqTpmBudget - estimatedInputTokens);
     let currentMaxTokens = callerMaxTokens
       ? Math.min(callerMaxTokens, remainingForCompletion)
       : Math.min(4096, remainingForCompletion);
@@ -452,9 +522,12 @@ class AIService {
       console.log(`[Groq] Calling ${model} (max_tokens: ${currentMaxTokens}, stream: ${isStream})`);
       const body = {
         model,
-        messages,
+        messages: safeMessages,
         max_tokens: currentMaxTokens
       };
+      if (model.startsWith('openai/gpt-oss-')) {
+        body.reasoning_effort = 'low';
+      }
       if (isStream) body.stream = true;
 
       try {
@@ -511,6 +584,11 @@ class AIService {
           const { response } = await this._fetchGroqChat(messages, { model: modelName, stream: false });
           const data = await response.json();
           const content = data.choices?.[0]?.message?.content || '';
+          if (!content.trim() && process.env.DEEPSEEK_API_KEY) {
+            console.warn(`[Groq] Empty content returned by ${modelName}; falling back to DeepSeek Chat`);
+            this._lastFallback = true;
+            return await this._complete(messages, 'deepseek/deepseek-chat');
+          }
           return content;
         } catch (groqErr) {
           if (process.env.DEEPSEEK_API_KEY) {
@@ -555,7 +633,7 @@ class AIService {
       }
 
       // Optimize max_tokens: DeepSeek Reasoner covers both reasoning and completion tokens
-      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
+      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 32768 : 8192) : 4096;
       let requestMessages = messages;
       if (isDeepSeek && modelName === 'deepseek-reasoner') {
         // DeepSeek Reasoner does best when system constraints don't silence reasoning
@@ -1068,7 +1146,7 @@ class AIService {
       return this.cleanHtml(html);
     }
 
-    const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
+    const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 32768 : 8192) : 4096;
     let requestMessages = messages;
     if (isDeepSeek && modelName === 'deepseek-reasoner') {
       requestMessages = [
@@ -1149,7 +1227,7 @@ class AIService {
         response = result.response;
       }
     } else {
-      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
+      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 32768 : 8192) : 4096;
       let requestMessages = messages;
       if (isDeepSeek && modelName === 'deepseek-reasoner') {
         requestMessages = [
@@ -1793,10 +1871,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
   /** Split a full document or fragment into separate presentation layers. */
   _splitHtmlDocument(input) {
-    let source = String(input || '')
-      .replace(/^```(?:html)?\s*/i, '')
-      .replace(/\s*```$/, '')
-      .trim();
+    let source = String(input || '').trim();
+    const fencedHtml = source.match(/```(?:html)?\s*([\s\S]*?)```/i);
+    if (fencedHtml && /<[a-z]/i.test(fencedHtml[1])) {
+      source = fencedHtml[1].trim();
+    } else {
+      source = source
+        .replace(/^```(?:html)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+      const docStart = source.search(/<!doctype\b|<html\b/i);
+      if (docStart > 0) {
+        source = source.slice(docStart);
+      }
+    }
     const css = [];
     const js = [];
 
