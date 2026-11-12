@@ -86,7 +86,8 @@ Requirements:
 - Use Inter font family from Google Fonts
 - Use minimal, clean design aesthetic with good whitespace
 - Include smooth transitions and hover effects
-- Do NOT use external CSS/JS files
+- Do NOT use external CSS/JS files or CDN <script src="..."> tags (including cdn.tailwindcss.com or unpkg) — external scripts are blocked by the preview sandbox
+- Do NOT hide the page body with opacity: 0 or leave an empty <div id="root"></div>; render full visible HTML inside <body> immediately
 - Do NOT explain anything
 - Do NOT use markdown code blocks
 - Do NOT output JSON — output ONLY raw HTML starting with <!DOCTYPE html>
@@ -95,20 +96,19 @@ Requirements:
 FRAMEWORK & STACK REQUESTS:
 - If the user asks for React, Vite, Tailwind CSS, Lucide icons, Recharts, Chart.js, or similar frameworks/libraries:
   - Deliver the complete, functional web app as a self-contained single HTML document starting with <!DOCTYPE html>.
-  - Emulate Tailwind styling with clean CSS variables and classes in <style>.
+  - Emulate Tailwind styling with clean CSS variables and classes directly inside <style>.
   - Implement Lucide/React icons as clean inline SVG elements.
   - Implement charts and visualizations (like Recharts) using HTML5 Canvas, SVG, or embedded JavaScript chart rendering.
   - NEVER refuse a request because of a requested framework or stack — always deliver the requested features and visual experience.
 
-CRITICAL FOR INTERACTIVE APPS (calculators, tools, games):
-- Use proper JavaScript event listeners (addEventListener or onclick attributes)
+CRITICAL FOR INTERACTIVE APPS (management systems, dashboards, calculators, tools, games):
+- Attach all event listeners in JavaScript using addEventListener (avoid inline onclick/onchange attributes, which are stripped by the HTML sanitizer)
 - Never use eval() for calculations — write explicit arithmetic functions
 - Maintain state variables (current input, previous input, operator)
 - Handle edge cases: division by zero, decimal points, consecutive operators
-- Add keyboard support (0-9, +, -, *, /, Enter, Escape, Backspace)
+- For calculators, add keyboard support (0-9, +, -, *, /, Enter, Escape, Backspace)
 - Test logic mentally: 2+3=5, 10/3=3.333, 5*0=0, 1/0=Error
 - Use descriptive variable names (not just a, b, x)
-- Each button must have an onclick handler that calls a function
 - IMPORTANT: Output HTML, NOT JSON. Start with <!DOCTYPE html>`;
 
 // The primary generation route asks for separated code. Smaller local models
@@ -145,7 +145,8 @@ CRITICAL REQUIREMENTS:
 - Include smooth CSS transitions and hover effects
 - Add subtle animations (fade-in on scroll, hover transforms)
 - Use semantic HTML5 elements
-- Do NOT use external CSS/JS files or CDN libraries (except Google Fonts)
+- Do NOT use external CSS/JS files or CDN libraries like cdn.tailwindcss.com or unpkg (except Google Fonts) — external scripts are blocked by the preview sandbox
+- Do NOT hide the page body with opacity: 0 or leave an empty <div id="root"></div>; render full visible HTML inside <body> immediately
 - Do NOT explain anything — output raw HTML only
 - Do NOT wrap in markdown code blocks
 - Do NOT output JSON — output ONLY raw HTML starting with <!DOCTYPE html>
@@ -159,10 +160,9 @@ FRAMEWORK & STACK REQUESTS:
   - Implement charts and visualizations (like Recharts) using HTML5 Canvas, SVG, or embedded JavaScript chart rendering.
   - NEVER refuse a request because of a requested framework or stack — always deliver the requested features and visual experience.
 
-CRITICAL FOR INTERACTIVE APPS (calculators, tools, converters, games):
-- Write complete, working JavaScript with proper event handling
+CRITICAL FOR INTERACTIVE APPS (management systems, calculators, tools, converters, games):
+- Write complete, working JavaScript using addEventListener (avoid inline onclick attributes, which are stripped by the HTML sanitizer)
 - NEVER use eval() for math — write explicit calculation functions
-- Each interactive element MUST have onclick or event listener
 - Maintain proper state (current value, previous value, operator)
 - Handle edge cases: division by zero, decimal limits, invalid input
 - Add keyboard support where appropriate
@@ -555,7 +555,7 @@ class AIService {
       }
 
       // Optimize max_tokens: DeepSeek Reasoner covers both reasoning and completion tokens
-      const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
       let requestMessages = messages;
       if (isDeepSeek && modelName === 'deepseek-reasoner') {
         // DeepSeek Reasoner does best when system constraints don't silence reasoning
@@ -1068,7 +1068,7 @@ class AIService {
       return this.cleanHtml(html);
     }
 
-    const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+    const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
     let requestMessages = messages;
     if (isDeepSeek && modelName === 'deepseek-reasoner') {
       requestMessages = [
@@ -1149,7 +1149,7 @@ class AIService {
         response = result.response;
       }
     } else {
-      const maxTokens = (isDeepSeek && modelName === 'deepseek-reasoner') ? 8192 : 4096;
+      const maxTokens = isDeepSeek ? (modelName === 'deepseek-reasoner' ? 16384 : 8192) : 4096;
       let requestMessages = messages;
       if (isDeepSeek && modelName === 'deepseek-reasoner') {
         requestMessages = [
@@ -1570,13 +1570,15 @@ class AIService {
     const css = this._replacePlaceholderImages(this._sanitizeCss([legacyParts.css, source.css].filter(Boolean).join('\n')));
     const js = this._sanitizeJavaScript([legacyParts.js, source.js].filter(Boolean).join('\n'));
 
-    // Post-process: Add onclick handlers to buttons that lack them
+    // Post-process: Add onclick handlers to calculator buttons that lack them
     const fixedHtml = this._fixMissingButtonHandlers(html, js);
-    const fixedJs = this._ensureButtonHandlers(js);
+    const fixedJs = this._ensureButtonHandlers(js, fixedHtml);
 
     const document = this.buildWebsiteDocument({ title, html: fixedHtml, css, js: fixedJs });
 
-    if (!legacyParts.body.trim()) {
+    const strippedVisibleText = legacyParts.body.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, '').trim();
+    const hasInteractiveOrMedia = /<(?:input|textarea|select|img|svg|canvas|video|audio|button)\b/i.test(legacyParts.body);
+    if (!legacyParts.body.trim() || (!strippedVisibleText && !hasInteractiveOrMedia && !fixedJs.trim())) {
       throw new Error('The AI response did not contain any page content');
     }
     if (document.length > 2_000_000) {
@@ -1593,9 +1595,22 @@ class AIService {
     };
   }
 
+  /** Detect whether a generated app is actually a calculator before injecting key/button helpers */
+  _isCalculatorMarkup(html = '', js = '') {
+    const code = String(js || '');
+    if (/(?:handleNumber|appendNumber|appendOperator|calculateResult)\b/.test(code)) {
+      return true;
+    }
+    const markup = String(html || '');
+    if (!markup.includes('<button')) return false;
+    const hasDigitBtn = /<button\b[^>]*>\s*[0-9]\s*<\/button>/i.test(markup);
+    const hasOpBtn = /<button\b[^>]*>\s*(?:[+\-*/×÷=−]|AC)\s*<\/button>/i.test(markup);
+    return (hasDigitBtn && hasOpBtn) || (/\bcalc(?:ulator)?\b/i.test(markup) && hasDigitBtn);
+  }
+
   /** Add onclick handlers to buttons that have text but no onclick */
   _fixMissingButtonHandlers(html, js) {
-    if (!html || !html.includes('<button')) return html;
+    if (!this._isCalculatorMarkup(html, js)) return html;
 
     const f = this._resolveCalculatorFunctionNames(js);
     // Map button text to function calls. Inner strings use single quotes so the
@@ -1628,8 +1643,8 @@ class AIService {
   }
 
   /** Ensure JavaScript has the handler functions that buttons call */
-  _ensureButtonHandlers(js) {
-    if (!js) return js;
+  _ensureButtonHandlers(js, html = '') {
+    if (!js || !this._isCalculatorMarkup(html, js)) return js;
 
     // If the model already wrote calculator functions (handleNumber,
     // appendNumber, …), wire buttons to whichever names it actually used.
@@ -1766,9 +1781,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const parts = this._splitHtmlDocument(html);
     const safeTitle = this._escapeHtml(this._sanitizeText(title || parts.title || 'Generated website', 80));
     const safeCss = this._sanitizeCss(css);
-    const safeJs = this._sanitizeJavaScript(js);
+    const safeJs = this._sanitizeJavaScript(js).replace(/<\/script/gi, '<\\/script');
+    const storageShim = safeJs.includes('__nbStorage') && !safeJs.includes('var __nbStorage=')
+      ? 'var __nbStorage=(function(){var d={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null;},setItem:function(k,v){d[String(k)]=String(v);},removeItem:function(k){delete d[String(k)];},clear:function(){d={};},key:function(i){return Object.keys(d)[i]||null;},get length(){return Object.keys(d).length;}};})();\n'
+      : '';
     const styleTag = safeCss ? `\n<style>\n${safeCss}\n</style>` : '';
-    const scriptTag = safeJs ? `\n<script>\n${safeJs}\n</script>` : '';
+    const scriptTag = safeJs ? `\n<script>\n${storageShim}${safeJs}\n</script>` : '';
 
     return `<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>${safeTitle}</title>${parts.head}${styleTag}\n</head>\n<body>\n${parts.body}\n${scriptTag}\n</body>\n</html>`;
   }
@@ -1791,15 +1809,30 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!/\bsrc\s*=/i.test(match)) js.push(content);
       return '';
     });
+    // Recover from truncated outputs that omit closing </style> or </script> tags,
+    // which otherwise swallow the rest of the document and leave the preview blank.
+    source = source.replace(/<style\b[^>]*>([\s\S]*)$/i, (_match, content) => {
+      css.push(content);
+      return '';
+    });
+    source = source.replace(/<script\b[^>]*>([\s\S]*)$/i, (match, content) => {
+      if (!/\bsrc\s*=/i.test(match)) js.push(content);
+      return '';
+    });
 
     const titleMatch = source.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-    const headMatch = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
-    const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+    const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)
+      || source.match(/<body\b[^>]*>([\s\S]*)$/i);
+    const headMatch = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)
+      || (!bodyMatch ? source.match(/<head\b[^>]*>([\s\S]*)$/i) : null);
     const head = this._sanitizeHead(headMatch?.[1] || '');
-    let body = bodyMatch?.[1] || source;
+    let body = bodyMatch
+      ? bodyMatch[1]
+      : (headMatch ? source.replace(/<head\b[^>]*>[\s\S]*?(?:<\/head>|$)/i, '') : source);
     body = body
       .replace(/<!doctype[^>]*>/gi, '')
-      .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, '');
+      .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, '')
+      .replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '');
 
     return {
       title: titleMatch?.[1] || '',
@@ -1846,12 +1879,19 @@ document.addEventListener('DOMContentLoaded', function() {
     return String(js || '')
       .replace(/^```(?:javascript|js)?\s*/i, '')
       .replace(/\s*```$/, '')
-      .replace(/<\/?script\b[^>]*>/gi, '')
+      .replace(/^\s*<script\b[^>]*>/i, '')
+      .replace(/<\/script>\s*$/i, '')
       // Preview isolation is enforced by CSP and iframe sandboxing as well.
-      .replace(/\b(?:window\.)?(?:top|parent|opener)\b/g, 'undefined')
+      // Only neutralize window-escaping references (not rect.top, { top: 0 }, etc.).
+      .replace(/\b(?:window|self|globalThis)\.(?:top|parent|opener)\b/g, 'undefined')
+      .replace(/(?<![.\w$])(?:top|parent|opener)(?=\s*\.\s*(?:location|postMessage|document|window|frames|close|opener|parent|top|history|alert|confirm|prompt)\b)/g, 'undefined')
       .replace(/\bdocument\.cookie\b/g, '""')
-      .replace(/\b(?:localStorage|sessionStorage)\b/g, 'undefined')
-      .replace(/\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\b/g, 'undefined')
+      // Map storage APIs to an isolated in-memory shim instead of undefined,
+      // which would otherwise throw TypeError on .getItem/.setItem inside sandboxed previews.
+      .replace(/(?<![.\w$])(?:(?:window|self|globalThis)\.)?(?:localStorage|sessionStorage)\b/g, '__nbStorage')
+      // Reject fetch cleanly instead of throwing a synchronous TypeError when called.
+      .replace(/(?<![.\w$])(?:(?:window|self|globalThis)\.)?fetch\b(?!\s*:)/g, '(function(){return Promise.reject(new Error("Preview offline"));})')
+      .replace(/(?<![.\w$])(?:(?:window|self|globalThis)\.)?(?:XMLHttpRequest|WebSocket|EventSource)\b/g, 'undefined')
       .trim();
   }
 

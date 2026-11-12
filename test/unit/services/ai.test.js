@@ -97,6 +97,52 @@ describe('AIService — Utilities', () => {
       expect(result.js).toContain("appendOperator(t === '−' ? '-' : t);");
       expect(result.js).toContain('calculate();');
     });
+
+    test('preserves legitimate CSS/DOM "top" properties, maps storage to __nbStorage, and escapes closing script tags', () => {
+      const result = aiService.normalizeGeneratedSite(JSON.stringify({
+        title: 'Library Hub',
+        html: '<main><button id="add-btn">Add Book</button></main>',
+        css: 'main { padding: 16px; }',
+        js: [
+          'const top = 12;',
+          'const box = { top: 0, left: 0 };',
+          'const rectTop = el.getBoundingClientRect().top;',
+          'const books = JSON.parse(localStorage.getItem("books") || "[]");',
+          'fetch("/api/books").catch(() => {});',
+          'const tmpl = "</script>";',
+          'window.parent.postMessage("x", "*");'
+        ].join('\n')
+      }));
+
+      expect(result.js).toContain('const top = 12;');
+      expect(result.js).toContain('{ top: 0, left: 0 }');
+      expect(result.js).toContain('.getBoundingClientRect().top');
+      expect(result.js).toContain('__nbStorage.getItem("books")');
+      expect(result.js).toContain('Promise.reject');
+      expect(result.js).toContain('undefined.postMessage');
+      expect(result.document).toContain('var __nbStorage=');
+      expect(result.document).toContain('<\\/script>');
+      expect(result.js).not.toContain('handleNumber');
+      expect(result.js).not.toContain('keydown');
+    });
+
+    test('recovers body content when a truncated <style> tag is unclosed and rejects empty SPA shells', () => {
+      const unclosedStyleDoc = '<!DOCTYPE html><html><head><title>Lib</title><style>body{color:#111}';
+      expect(() => aiService.normalizeGeneratedSite(unclosedStyleDoc))
+        .toThrow('did not contain any page content');
+
+      const recoverableDoc = '<!DOCTYPE html><html><head><title>Lib</title></head><body><h1>Library Hub</h1><style>body{color:#111}';
+      const recovered = aiService.normalizeGeneratedSite(recoverableDoc);
+      expect(recovered.html).toContain('<h1>Library Hub</h1>');
+      expect(recovered.css).toContain('body{color:#111}');
+
+      expect(() => aiService.normalizeGeneratedSite(JSON.stringify({
+        title: 'Blank SPA',
+        html: '<div id="root"></div>',
+        css: 'body { margin: 0; }',
+        js: ''
+      }))).toThrow('did not contain any page content');
+    });
   });
 
   describe('cleanHtml', () => {
