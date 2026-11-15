@@ -22,14 +22,14 @@ function asProjectSummary(project) {
 
 function validateProjectInput(input, { requireName = false } = {}) {
   const errors = [];
-  if (requireName && (!input.name || !String(input.name).trim())) {
-    errors.push('Project name is required');
+  if (requireName && (!input.name || !String(input.name).trim()) && (!input.prompt || !String(input.prompt).trim())) {
+    errors.push('Project name or prompt is required');
   }
   if (input.name !== undefined && String(input.name).trim().length > 80) {
     errors.push('Project name cannot exceed 80 characters');
   }
-  if (input.prompt !== undefined && String(input.prompt).length > 100_000) {
-    errors.push('Prompt cannot exceed 100,000 characters');
+  if (input.prompt !== undefined && String(input.prompt).length > 200_000) {
+    errors.push('Prompt cannot exceed 200,000 characters');
   }
   if (input.html !== undefined && String(input.html).length > 2_000_000) {
     errors.push('Generated website is too large to save');
@@ -81,7 +81,11 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const errors = validateProjectInput(req.body, { requireName: true });
+    const rawName = String(req.body.name || '').trim();
+    const rawPrompt = String(req.body.prompt || '').trim();
+    const resolvedName = (rawName || rawPrompt.slice(0, 60).replace(/\s+/g, ' ').trim() || 'Untitled project').slice(0, 80);
+
+    const errors = validateProjectInput({ ...req.body, name: resolvedName }, { requireName: true });
     if (errors.length) return res.status(400).json({ error: errors.join(', ') });
 
     const projectCount = await Project.countDocuments({ owner: req.user._id });
@@ -100,13 +104,17 @@ router.post('/', async (req, res, next) => {
 
     const project = await Project.create({
       owner: req.user._id,
-      name: String(req.body.name).trim(),
-      prompt: String(req.body.prompt || '').trim(),
+      name: resolvedName,
+      prompt: rawPrompt,
       html: String(req.body.html || ''),
       attachments
     });
     res.status(201).json({ project: asProjectSummary(project) });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors || {}).map(e => e.message);
+      return res.status(400).json({ error: messages.join(', ') || error.message });
+    }
     next(error);
   }
 });

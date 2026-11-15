@@ -356,7 +356,7 @@ const DEEPSEEK_MODELS: Model[] = [
     if (!html) return
     try {
       await api.createProject({
-        name: prompt.slice(0, 60) || 'Untitled project',
+        name: (prompt.trim().replace(/\s+/g, ' ').slice(0, 60)) || 'Untitled project',
         prompt,
         html,
         attachments: files.map(f => ({

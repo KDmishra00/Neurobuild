@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const versionSchema = new mongoose.Schema({
   html: { type: String, required: true, maxlength: 2_000_000 },
-  prompt: { type: String, default: '', maxlength: 10_000 },
+  prompt: { type: String, default: '', maxlength: 200_000 },
   createdAt: { type: Date, default: Date.now }
 }, { _id: false });
 
@@ -29,7 +29,7 @@ const projectSchema = new mongoose.Schema({
   prompt: {
     type: String,
     default: '',
-    maxlength: 10_000
+    maxlength: 200_000
   },
   html: {
     type: String,

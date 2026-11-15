@@ -9,7 +9,7 @@ const messageSchema = new mongoose.Schema({
   content: {
     type: String,
     required: true,
-    maxlength: 50_000
+    maxlength: 200_000
   },
   html: {
     type: String,
