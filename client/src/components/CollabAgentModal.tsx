@@ -257,7 +257,7 @@ export default function CollabAgentModal({
       { name: 'routes.js', content: backendCode || '// Express Routes\n' },
       {
         name: 'README.md',
-        content: `# ${currentPrompt || 'Enhanced Project'}\n\nGenerated with Neurobuild Autonomous Multi-Agent AI (Module 6).\n\n## Quick Start\n\`\`\`bash\nnpm install express better-sqlite3 cors\nnode server.js\n\`\`\`\n`,
+        content: `# ${currentPrompt || 'Enhanced Project'}\n\nGenerated with Neurobuild Autonomous Multi-Agent AI.\n\n## Quick Start\n\`\`\`bash\nnpm install express better-sqlite3 cors\nnode server.js\n\`\`\`\n`,
       },
     ]
 
@@ -282,7 +282,7 @@ export default function CollabAgentModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-text text-base">Module 6: Collaborative Agentic AI</h2>
+                <h2 className="font-bold text-text text-base">Collaborative Agentic AI</h2>
                 <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px]">
                   5-Agent Team
                 </Badge>

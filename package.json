@@ -20,7 +20,11 @@
     "testEnvironment": "node",
     "testTimeout": 15000
   },
-  "keywords": ["ai", "website-builder", "ollama"],
+  "keywords": [
+    "ai",
+    "website-builder",
+    "ollama"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -28,7 +32,7 @@
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
@@ -42,5 +46,16 @@
     "jest": "^29.7.0",
     "mongodb-memory-server": "^10.4.0",
     "supertest": "^7.1.0"
-  }
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDmishra00/Neurobuild.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KDmishra00/Neurobuild/issues"
+  },
+  "homepage": "https://github.com/KDmishra00/Neurobuild#readme"
 }
