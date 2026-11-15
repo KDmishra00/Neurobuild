@@ -145,12 +145,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the SPA at root and support client-side routing
 app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(indexFile);
 });
 
 // SPA fallback — any non-API GET or HEAD that isn't a static asset returns index.html
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(indexFile);
   }
   next();
