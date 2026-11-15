@@ -76,6 +76,18 @@ app.use(cors(corsOptions));
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+// Live request logger for terminal visibility
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    if (req.originalUrl.startsWith('/api') || req.originalUrl === '/') {
+      const duration = Date.now() - start;
+      console.log(`📡 [API Call] ${req.method} ${req.originalUrl} ➔ Status: ${res.statusCode} (${duration}ms)`);
+    }
+  });
+  next();
+});
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
